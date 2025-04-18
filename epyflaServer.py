@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import ssl
+import epidemic_surveillance_tools as est
 from flask import Flask, request, jsonify, abort
 
 # Create the Flask application instance
@@ -35,6 +36,49 @@ def process_json():
              # This case might happen if JSON is malformed but Content-Type was set
              raise ValueError("Malformed JSON received.")
         print(f"Received JSON data from {request.remote_addr}: {received_data}")
+
+        if "init" in received_data:
+            # This is a special case where we might want to initialize something
+            # For example, if the JSON contains an 'init' key, we could log it or perform an action
+            print(f"Initialization request received: {received_data['init']}")
+            # 1. Generate simulation data
+            simulated_data = est.generate_simulation_data(
+                start_date='2020-01-01',
+                end_date='2022-12-31',
+                lam=8,
+                outbreak_threshold=15
+            )
+            print("\nGenerated Data Head:")
+            print(simulated_data.head())
+            jsonify({'message': 'Simulation data generated successfully.'}), 200 # 200 OK status code})
+
+        if "graph" in received_data:
+
+            # 2. Define where to save the plot
+            # Make sure the path is correct for your system
+            # Using a relative path here for simplicity
+            output_plot_path = 'farrington_simulation_plot.png'
+            # For a specific path like in the original example:
+            # output_plot_path = r'C:\Users\taohe\Documents\pyproject\farrington_simulation_plot.png'
+            # Ensure the directory exists or the script has permission to create it.
+
+            # 3. Generate and save the plot using the simulated data
+            try:
+                est.generate_plot_from_data(
+                      df=simulated_data,
+                      save_path=output_plot_path,
+                      train_split_ratio=0.75, # Example: changed ratio
+                      alpha=0.05,
+                      years_back=1
+                )
+                jsonify({'message': 'Plot generated successfully.', 'plot_path': output_plot_path}), 200 # 200 OK status code
+            except Exception as e:
+               print(f"\nAn error occurred during plot generation: {e}")
+            
+
+
+
+        
     except Exception as e:
         print(f"Error processing JSON data: {e}")
         # 400 Bad Request

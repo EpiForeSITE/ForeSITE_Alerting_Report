@@ -57,6 +57,6 @@ plt.tight_layout()
 
 # Save the plot to a file
 import os
-save_path = r'C:\Users\taohe\Documents\PyProjects\farrington_plot.png'
+save_path = r'C:\Users\taohe\Documents\GitHub\ForeSITEBox\farrington_plot.png'
 plt.savefig(save_path, dpi=300, bbox_inches='tight')
 plt.close()
