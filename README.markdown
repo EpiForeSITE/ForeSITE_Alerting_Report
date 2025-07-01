@@ -17,8 +17,10 @@
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
 
 In the current version, we fully support four CDC data sources, including:
-•	COVID-19 Testing
-•	Real-time Deaths (COVID-19, Pneumonia, and Influenza)
+
+- **COVID-19 Testing**
+- **Real-time Deaths (COVID-19, Pneumonia, and Influenza)**
+
 The application allows users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
 
 
