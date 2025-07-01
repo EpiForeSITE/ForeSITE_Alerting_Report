@@ -3,7 +3,7 @@
 <img src="images/foreSITEAlertingReport_icon2.jpg" alt="ForeSITE Alerting Report Logo" width="200"/>
 
 
-**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, eySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and public health professionals.
+**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and public health professionals.
 
 ## Features
 
