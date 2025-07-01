@@ -1,0 +1,46 @@
+﻿<Window x:Class="ForeSITETestApp.RichTextEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ForeSITETestApp"
+        mc:Ignorable="d"
+        Title="Title Editor" Height="120" Width="490" WindowStyle="ToolWindow" ResizeMode="NoResize"
+        Topmost="True" WindowStartupLocation="CenterOwner">
+    <Grid Margin="0,0,0,5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <ToolBar Grid.Row="0" Height="30">
+            <ToggleButton x:Name="BoldButton" Click="BoldButton_Click" Content="B" FontWeight="Bold" Width="30" ToolTip="Bold"/>
+            <ToggleButton x:Name="ItalicButton" Click="ItalicButton_Click" Content="I" FontStyle="Italic" Width="30" ToolTip="Italic"/>
+            <ToggleButton x:Name="UnderlineButton" Click="UnderlineButton_Click" Content="U"  Width="30" ToolTip="Underline"/>
+            <Separator/>
+            <ComboBox x:Name="FontSizeComboBox" SelectionChanged="FontSizeComboBox_SelectionChanged" Width="60" ToolTip="Font Size">
+                <ComboBoxItem Content="12"/>
+                <ComboBoxItem Content="16" IsSelected="True"/>
+                <ComboBoxItem Content="20"/>
+                <ComboBoxItem Content="24"/>
+            </ComboBox>
+            <Separator/>
+            <ToggleButton x:Name="AlignLeftButton" Click="AlignLeftButton_Click" Content="Left" Width="40" ToolTip="Align Left"/>
+            <ToggleButton x:Name="AlignCenterButton" Click="AlignCenterButton_Click" Content="Center" Width="40" ToolTip="Align Center" IsChecked="True"/>
+            <ToggleButton x:Name="AlignRightButton" Click="AlignRightButton_Click" Content="Right" Width="40" ToolTip="Align Right"/>
+            <Separator/>
+            <ComboBox x:Name="FontFamilyComboBox" SelectionChanged="FontFamilyComboBox_SelectionChanged" Width="100" ToolTip="Font Family">
+                <ComboBoxItem Content="Arial"/>
+                <ComboBoxItem Content="Times New Roman"/>
+                <ComboBoxItem Content="Calibri" IsSelected="True"/>
+                <ComboBoxItem Content="Verdana"/>
+            </ComboBox>
+        </ToolBar>
+
+        <!-- Placeholder for RichTextBox synchronization -->
+        <Border Grid.Row="1" Margin="5" Background="White">
+            <!-- RichTextBox is managed in code-behind -->
+        </Border>
+    </Grid>
+</Window>

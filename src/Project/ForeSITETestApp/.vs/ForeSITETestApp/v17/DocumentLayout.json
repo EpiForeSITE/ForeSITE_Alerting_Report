@@ -1,0 +1,198 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\dashboard.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\dashboard.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\dashboard.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\dashboard.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\datasource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\datasource.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\app.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\app.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\plottitledialog.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\plottitledialog.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\plottitledialog.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\plottitledialog.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\richtexteditorwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\richtexteditorwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\richtexteditorwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\richtexteditorwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|c:\\users\\taohe\\source\\repos\\foresitetestapp\\foresitetestapp\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{25CED1A6-A23F-4C1F-B617-1744DAC21CEE}|ForeSITETestApp\\ForeSITETestApp.csproj|solutionrelative:foresitetestapp\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 265,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Dashboard.xaml",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\Dashboard.xaml",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\Dashboard.xaml",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\Dashboard.xaml",
+              "RelativeToolTip": "ForeSITETestApp\\Dashboard.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-06-17T22:40:34.235Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "DataSource.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\DataSource.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\DataSource.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\DataSource.cs",
+              "RelativeToolTip": "ForeSITETestApp\\DataSource.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-11T00:48:43.979Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Dashboard.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\Dashboard.xaml.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\Dashboard.xaml.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\Dashboard.xaml.cs",
+              "RelativeToolTip": "ForeSITETestApp\\Dashboard.xaml.cs",
+              "ViewState": "AgIAACEAAAAAAAAAAAAAAE0DAAATAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-05T20:08:11.088Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "RichTextEditorWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\RichTextEditorWindow.xaml",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\RichTextEditorWindow.xaml",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\RichTextEditorWindow.xaml",
+              "RelativeToolTip": "ForeSITETestApp\\RichTextEditorWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-06-17T23:27:21.795Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\MainWindow.xaml.cs",
+              "RelativeToolTip": "ForeSITETestApp\\MainWindow.xaml.cs",
+              "ViewState": "AgIAADEAAAAAAAAAAAAvwEQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-03-18T23:41:11.537Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "PlotTitleDialog.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\PlotTitleDialog.xaml.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\PlotTitleDialog.xaml.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\PlotTitleDialog.xaml.cs",
+              "RelativeToolTip": "ForeSITETestApp\\PlotTitleDialog.xaml.cs",
+              "ViewState": "AgIAABcAAAAAAAAAAAA8wB8AAAApAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-20T20:09:27.361Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "App.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\App.xaml.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\App.xaml.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\App.xaml.cs",
+              "RelativeToolTip": "ForeSITETestApp\\App.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-05-22T19:12:11.191Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "RichTextEditorWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\RichTextEditorWindow.xaml.cs",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\RichTextEditorWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\RichTextEditorWindow.xaml.cs",
+              "RelativeToolTip": "ForeSITETestApp\\RichTextEditorWindow.xaml.cs",
+              "ViewState": "AgIAAA4AAAAAAAAAAAAgwB4AAAAeAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-06-17T23:31:39.71Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "PlotTitleDialog.xaml",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\PlotTitleDialog.xaml",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\PlotTitleDialog.xaml",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\PlotTitleDialog.xaml",
+              "RelativeToolTip": "ForeSITETestApp\\PlotTitleDialog.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-06-20T20:06:31.007Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\MainWindow.xaml",
+              "RelativeToolTip": "ForeSITETestApp\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-06-29T03:21:26.862Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "App.xaml",
+              "DocumentMoniker": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\App.xaml",
+              "RelativeDocumentMoniker": "ForeSITETestApp\\App.xaml",
+              "ToolTip": "C:\\Users\\taohe\\source\\repos\\ForeSITETestApp\\ForeSITETestApp\\App.xaml",
+              "RelativeToolTip": "ForeSITETestApp\\App.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-03-19T14:31:14.97Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
