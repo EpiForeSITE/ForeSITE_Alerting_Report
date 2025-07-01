@@ -1,13 +1,13 @@
 # ForeSITE Alerting Report
 
-![ForeSITE Alerting Report](https://via.placeholder.com/800x200.png?text=ForeSITE+Alerting+Report) <!-- Replace with actual screenshot or logo -->
+![ForeSITE Alerting Report](images/foreSITEAlertingReport_icon2.jpg) <!-- Replace with actual screenshot or logo -->
 
-**ForeSITE Alerting Report** is a WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, and a Flask backend, it provides a user-friendly interface for analysts and public health professionals.
+**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, eySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and public health professionals.
 
 ## Features
 
 - **Report Generation**: Create PDF reports with customizable titles and data-driven plots, powered by the `epySurv` module.
-- **Data Source Management**: Add, edit, and delete data sources with API integration to a Flask server.
+- **Data Source Management**: Add, edit, and delete data sources from Providers with API integration.
 - **Plot Visualization**: Generate plots using CDC public surveillance data or user-imported datasets, with configurable parameters (e.g., data source, time range, threshold, model like Farrington).
 - **Data Import**: Import custom surveillance data (e.g., CSV, JSON) for processing with `epySurv` via the Flask API.
 - **Automated Scheduling**: Schedule monthly report generation using Windows Task Scheduler, with automatic email delivery via Outlook.
@@ -15,27 +15,32 @@
 - **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
 
+In the current version, we fully support four CDC data sources, including:
+•	COVID-19 Testing
+•	Real-time Deaths (COVID-19, Pneumonia, and Influenza)
+The application allows users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
+
+
 ## Prerequisites
 
 - **Operating System**: Windows 10 or later
-- **.NET Framework**: .NET 6.0 or higher
-- **Python**: Python 3.8 or later (for Flask server)
+- **.NET Framework**: .NET 8.0 or higher
+- **Python**: Python 3.7 or later (for Flask server and epySurv package)
 - **Dependencies**:
   - **WPF Application**:
     - [PdfSharpCore](https://github.com/ststeiger/PdfSharpCore) for PDF generation
     - [Newtonsoft.Json](https://www.newtonsoft.com/json) for JSON parsing
-    - Microsoft Outlook (for automated email delivery)
+    - **TODO** Microsoft Outlook (for automated email delivery)
   - **Flask Server**:
     - Flask
     - `epySurv` (surveillance data processing module, assumed to be a custom or external library)
     - Other Python dependencies (e.g., `pandas`, `matplotlib` for data processing and plotting)
 - **Tools**:
   - Visual Studio 2022 or later (with WPF development workload)
-  - PowerShell (for scheduled task execution)
+  - **TODO** PowerShell (for scheduled task execution)
   - Python environment (e.g., Anaconda, virtualenv)
-- **Administrative Privileges**: Required for creating scheduled tasks
-- **Output Directory**: `C:\Reports` for generated PDFs
-- **Scripts Directory**: `C:\Scripts` for PowerShell script (`GenerateReport.ps1`)
+- **TODO: Administrative Privileges**: Required for creating scheduled tasks
+-
 
 ## Installation
 
@@ -52,14 +57,8 @@ cd ForeSITE-Alerting-Report
      ```bash
      dotnet restore
      ```
-2. **Configure Output and Script Directories**:
-   - Create `C:\Reports` for storing generated PDFs.
-   - Create `C:\Scripts` and place `GenerateReport.ps1` there (see [Scripts](#scripts)).
-   - Update `GenerateReport.ps1` with the correct path to `ForeSITETestApp.exe`:
-     ```powershell
-     $exePath = "C:\Program Files\ForeSITETestApp\ForeSITETestApp.exe"
-     ```
-3. **Build the Solution**:
+
+2. **Build the Solution**:
    - Build in Visual Studio (`Build > Build Solution`) or via CLI:
      ```bash
      dotnet build
@@ -85,21 +84,15 @@ cd ForeSITE-Alerting-Report
      ```bash
      pip install -r requirements.txt
      ```
-4. **Run the Flask Server**:
+4. **Just for test: Run the Flask Server**:
    - Start the server at `http://127.0.0.1:5001`:
      ```bash
      python app.py
      ```
-   - Ensure the server is running before using the WPF application.
+     Our Application doesn't need to call the Flask Server manually. it will be called by app into the background.
 
-### 4. Configure Outlook
-- Ensure Microsoft Outlook is installed and configured with a default email account.
-- Update `GenerateReport.ps1` with the target recipient email:
-  ```powershell
-  $recipient = "recipient@example.com"
-  ```
 
-### 5. Run the Application
+### 4. Run the Application
 - Run the WPF application as administrator to enable task scheduling:
   ```bash
   dotnet run --project ForeSITETestApp
@@ -121,6 +114,7 @@ cd ForeSITE-Alerting-Report
    - Plots are fetched via the Flask API (`http://127.0.0.1:5001/epyapi`) using `epySurv`.
 4. **Save as PDF**:
    - Click "Save" to generate a PDF report (`Report.pdf`) via a file dialog.
+
 
 ### Importing Custom Data
 1. Navigate to the "Data Source Manager" tab.
@@ -144,28 +138,7 @@ cd ForeSITE-Alerting-Report
    - **Action**: Runs `GenerateReport.ps1` to generate a PDF (`C:\Reports\Report_YYYYMM.pdf`) and email it via Outlook.
 3. Ensure the Flask server is running and the application is run as administrator.
 
-### Manual Task Execution
-- Run the scheduled task manually:
-  ```cmd
-  schtasks /Run /TN MonthlyReportGeneration
-  ```
-- Check `C:\Reports` for the PDF and the recipient’s email for the attachment.
 
-## Scripts
-
-### GenerateReport.ps1
-Located at `C:\Scripts\GenerateReport.ps1`, this PowerShell script:
-- Runs `ForeSITETestApp.exe` with the `--generate-report` argument to create a PDF.
-- Sends the PDF via Outlook to a specified recipient.
-- Example configuration:
-  ```powershell
-  $exePath = "C:\Program Files\ForeSITETestApp\ForeSITETestApp.exe"
-  $outputDir = "C:\Reports"
-  $outputFile = Join-Path -Path $outputDir -ChildPath ("Report_" + (Get-Date -Format "yyyyMM") + ".pdf")
-  $recipient = "recipient@example.com"
-  $subject = "Monthly Report " + (Get-Date -Format "yyyy-MM")
-  $body = "Please find the monthly report attached."
-  ```
 
 ## Flask Server
 
@@ -206,31 +179,33 @@ ForeSITE-Alerting-Report/
 │   ├── PlotTitleDialog.xaml   # Dialog for plot titles
 │   └── ForeSITETestApp.sln    # Solution file
 ├── server/
-│   ├── app.py                 # Flask server for epySurv integration
+│   ├── epyflaServer.py        # Flask server for epySurv integration
 │   └── requirements.txt       # Python dependencies
-├── Scripts/
-│   └── GenerateReport.ps1     # PowerShell script for automated report generation and emailing
+│   
 ├── README.md                  # This file
 └── LICENSE                    # License file (add your preferred license)
 ```
 
 ## Dependencies
 
-- **WPF Application**:
+- **C# WPF Application**:
   - PdfSharpCore: For PDF generation
   - Newtonsoft.Json: For API response parsing
-  - Microsoft.Office.Interop.Outlook: For email sending (requires Outlook installed)
+
 - **Flask Server**:
   - Flask: Web server framework
   - epySurv: Surveillance data processing module
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
-- **Windows Task Scheduler**: For scheduling automated reports
+- **TODO: Windows Task Scheduler**: For scheduling automated reports
 
 ## Demo Data
 
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
 - Select CDC data as a data source in the "Add Plot" dialog.
-- Import custom datasets (e.g., CSV, JSON) via the "Data Source Manager" for surveillance analysis.
+
+![Screenshot 2025-07-01](images/Screenshot-2025-7-1-01.png)
+
+![Screenshot 2025-07-01](images/Screenshot-2025-7-1-02.png)
 
 ## Troubleshooting
 
@@ -240,18 +215,11 @@ The application uses **CDC public surveillance data** for demonstration purposes
 - **Flask Server Not Running**:
   - Ensure the server is running at `http://127.0.0.1:5001` before adding plots.
   - Check Python dependencies: `pip list` and install missing packages.
-- **Task Scheduler Fails**:
-  - Ensure the application is run as administrator.
-  - Verify `C:\Scripts\GenerateReport.ps1` exists and `$exePath` is correct.
-  - Run `schtasks /Query /TN MonthlyReportGeneration` to check task status.
-- **Email Not Sent**:
-  - Confirm Outlook is installed and configured with a default account.
-  - Update `$recipient` in `GenerateReport.ps1`.
-  - Check for Outlook security prompts and disable via group policy if needed.
 - **Plots Not Generated**:
   - Verify the Flask server is running and accessible.
   - Ensure data source configuration (CDC or custom) is correct.
   - Check `epySurv` module documentation for specific requirements.
+  - Check if we generated time-series data from Data Sources
 
 ## Contributing
 
@@ -268,4 +236,5 @@ Contributions are welcome! Please follow these steps:
 
 ## Contact
 
-For issues or feature requests, please open an issue on GitHub or contact [your.email@example.com](mailto:your.email@example.com).
+For issues or feature requests, please open an issue on GitHub or contact [Tao.He@utah.edu](mailto:tao.he@utah.edu
+).
