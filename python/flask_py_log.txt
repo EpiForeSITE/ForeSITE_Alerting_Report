@@ -1,0 +1,389 @@
+[2025-07-01 00:07:06,759] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:07:06,759] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:07:07,870] [INFO]  * Restarting with stat
+[2025-07-01 00:07:13,057] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:07:13,058] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:07:13,073] [WARNING]  * Debugger is active!
+[2025-07-01 00:07:13,089] [INFO]  * Debugger PIN: 634-980-425
+[2025-07-01 00:07:29,935] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:07:29,935] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:07:29,951] [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+[2025-07-01 00:07:29,951] [INFO] [33mPress CTRL+C to quit[0m
+[2025-07-01 00:07:29,953] [INFO]  * Restarting with stat
+[2025-07-01 00:07:34,618] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:07:34,619] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:07:34,630] [WARNING]  * Debugger is active!
+[2025-07-01 00:07:34,639] [INFO]  * Debugger PIN: 634-980-425
+[2025-07-01 00:08:00,833] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu death Plot', 'TrainEndDate': '2024-12-30'}}
+[2025-07-01 00:08:00,836] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu death Plot', 'TrainEndDate': '2024-12-30'}
+[2025-07-01 00:08:00,837] [INFO] Model: Farrington, DataSource: Flu Deaths, Title: CDC Flu death Plot, YearBack: 3,                 UseTrainSplit: False, Threshold: 1000, TrainSplitRatio: 0.7
+[2025-07-01 00:08:00,838] [INFO] Using TrainEndDate: 2024-12-30 00:00:00
+[2025-07-01 00:08:00,838] [INFO] Output plot path: farrington_death_plot_3e3be763.png
+[2025-07-01 00:08:00,839] [INFO] Flu Deaths
+[2025-07-01 00:08:03,101] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:08:03,111] [INFO] Data generation failed: "['flu_deaths'] not in index"
+[2025-07-01 00:08:03,115] [INFO] Plot generation error: 500 Internal Server Error: Data generation failed.
+[2025-07-01 00:08:03,118] [INFO] 127.0.0.1 - - [01/Jul/2025 00:08:03] "[35m[1mPOST /epyapi HTTP/1.1[0m" 500 -
+[2025-07-01 00:11:31,872] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:11:32,218] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:11:32,799] [INFO]  * Restarting with stat
+[2025-07-01 00:11:37,942] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:11:37,942] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:11:37,956] [WARNING]  * Debugger is active!
+[2025-07-01 00:11:37,966] [INFO]  * Debugger PIN: 634-980-425
+[2025-07-01 00:11:46,858] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}}
+[2025-07-01 00:11:46,859] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}
+[2025-07-01 00:11:46,859] [INFO] Model: Farrington, DataSource: Flu Deaths, Title: CDC Flu Death Plot, YearBack: 3,                 UseTrainSplit: False, Threshold: 1000, TrainSplitRatio: 0.7
+[2025-07-01 00:11:46,859] [INFO] Using TrainEndDate: 2024-12-30 00:00:00
+[2025-07-01 00:11:46,859] [INFO] Output plot path: farrington_death_plot_d2908cf4.png
+[2025-07-01 00:11:46,860] [INFO] Flu Deaths
+[2025-07-01 00:11:49,376] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:11:49,383] [INFO] Data generation failed: "['flu_deaths'] not in index"
+[2025-07-01 00:11:49,384] [INFO] Plot generation error: 500 Internal Server Error: Data generation failed.
+[2025-07-01 00:11:49,384] [INFO] 127.0.0.1 - - [01/Jul/2025 00:11:49] "[35m[1mPOST /epyapi HTTP/1.1[0m" 500 -
+[2025-07-01 00:12:17,451] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:12:17,451] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:12:17,469] [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+[2025-07-01 00:12:17,469] [INFO] [33mPress CTRL+C to quit[0m
+[2025-07-01 00:12:17,471] [INFO]  * Restarting with stat
+[2025-07-01 00:12:22,381] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:12:22,381] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:12:22,396] [WARNING]  * Debugger is active!
+[2025-07-01 00:12:22,406] [INFO]  * Debugger PIN: 634-980-425
+[2025-07-01 00:12:47,315] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}}
+[2025-07-01 00:12:47,328] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}
+[2025-07-01 00:12:47,329] [INFO] Model: Farrington, DataSource: Flu Deaths, Title: CDC Flu Death Plot, YearBack: 3,                 UseTrainSplit: False, Threshold: 1000, TrainSplitRatio: 0.7
+[2025-07-01 00:12:47,330] [INFO] Using TrainEndDate: 2024-12-30 00:00:00
+[2025-07-01 00:12:47,332] [INFO] Output plot path: farrington_death_plot_dae5928d.png
+[2025-07-01 00:12:47,333] [INFO] Flu Deaths
+[2025-07-01 00:12:49,723] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:12:49,734] [INFO] Data generation failed: "['flu_deaths'] not in index"
+[2025-07-01 00:12:49,740] [INFO] Plot generation error: 500 Internal Server Error: Data generation failed.
+[2025-07-01 00:12:49,744] [INFO] 127.0.0.1 - - [01/Jul/2025 00:12:49] "[35m[1mPOST /epyapi HTTP/1.1[0m" 500 -
+[2025-07-01 00:13:31,932] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:13:32,366] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
+[2025-07-01 00:13:33,335] [INFO]  * Restarting with stat
+[2025-07-01 00:13:38,240] [INFO] Starting Epy Flask server on https://localhost:5001
+[2025-07-01 00:13:38,240] [INFO] Only accepting JSON POST requests to /process from localhost.
+[2025-07-01 00:13:38,251] [WARNING]  * Debugger is active!
+[2025-07-01 00:13:38,260] [INFO]  * Debugger PIN: 634-980-425
+[2025-07-01 00:13:46,416] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}}
+[2025-07-01 00:13:46,416] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}
+[2025-07-01 00:13:46,416] [INFO] Model: Farrington, DataSource: Flu Deaths, Title: CDC Flu Death Plot, YearBack: 3,                 UseTrainSplit: False, Threshold: 1000, TrainSplitRatio: 0.7
+[2025-07-01 00:13:46,417] [INFO] Using TrainEndDate: 2024-12-30 00:00:00
+[2025-07-01 00:13:46,417] [INFO] Output plot path: farrington_death_plot_fec5311e.png
+[2025-07-01 00:13:46,417] [INFO] Flu Deaths
+[2025-07-01 00:13:48,622] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:13:48,666] [INFO]              end_date mmwr_week  n_cases  n_outbreak_cases
+2019-12-29 2020-01-04         1      434                 0
+2020-01-05 2020-01-11         2      475                 0
+2020-01-12 2020-01-18         3      468                 0
+2020-01-19 2020-01-25         4      500                 0
+2020-01-26 2020-02-01         5      481                 0
+...               ...       ...      ...               ...
+2025-05-18 2025-05-24        21       42                 0
+2025-05-25 2025-05-31        22       53                 0
+2025-06-01 2025-06-07        23       34                 0
+2025-06-08 2025-06-14        24       37                 0
+2025-06-15 2025-06-21        25       14                 0
+
+[286 rows x 4 columns]
+[2025-07-01 00:13:48,667] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2025-04-13', '2025-04-20', '2025-04-27', '2025-05-04',
+               '2025-05-11', '2025-05-18', '2025-05-25', '2025-06-01',
+               '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', length=286, freq='W-SUN')
+[2025-07-01 00:13:48,668] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2025-04-13', '2025-04-20', '2025-04-27', '2025-05-04',
+               '2025-05-11', '2025-05-18', '2025-05-25', '2025-06-01',
+               '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', length=286, freq='W-SUN')
+[2025-07-01 00:13:48,686] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2024-10-27', '2024-11-03', '2024-11-10', '2024-11-17',
+               '2024-11-24', '2024-12-01', '2024-12-08', '2024-12-15',
+               '2024-12-22', '2024-12-29'],
+              dtype='datetime64[ns]', length=262, freq='W-SUN')
+[2025-07-01 00:13:48,687] [INFO] Train size: 262 Test size: 24
+[2025-07-01 00:13:48,687] [INFO] DatetimeIndex(['2025-01-05', '2025-01-12', '2025-01-19', '2025-01-26',
+               '2025-02-02', '2025-02-09', '2025-02-16', '2025-02-23',
+               '2025-03-02', '2025-03-09', '2025-03-16', '2025-03-23',
+               '2025-03-30', '2025-04-06', '2025-04-13', '2025-04-20',
+               '2025-04-27', '2025-05-04', '2025-05-11', '2025-05-18',
+               '2025-05-25', '2025-06-01', '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', freq='W-SUN')
+[2025-07-01 00:13:48,688] [INFO] Fitting FarringtonFlexible model... FarringtonFlexible(years_back=3, window_half_width=3, reweight=True, weights_threshold=2.58, alpha=0.05, trend=True, trend_threshold=0.05, past_period_cutoff=4, min_cases_in_past_periods=5, power_transform='2/3', past_weeks_not_included=26, threshold_method='delta')
+[2025-07-01 00:13:48,693] [INFO] Model fitting complete.
+[2025-07-01 00:13:49,125] [INFO] Predictions:             n_cases  n_outbreak_cases  alarm   upperbound
+2025-01-05      971                 0  False  1115.664482
+2025-01-12     1010                10  False  1058.555782
+2025-01-19     1182               182   True   954.614829
+2025-01-26     1508               508   True   800.472804
+2025-02-02     1772               772   True   674.694249
+2025-02-09     1860               860   True   600.178348
+2025-02-16     1772               772   True   544.030226
+2025-02-23     1498               498   True   496.398133
+2025-03-02     1193               193   True   462.104214
+2025-03-09      894                 0   True   417.765259
+2025-03-16      685                 0   True   380.802771
+2025-03-23      481                 0   True   339.002605
+2025-03-30      330                 0   True   282.069555
+2025-04-06      233                 0  False   384.261058
+2025-04-13      161                 0  False   307.451327
+2025-04-20      124                 0  False   238.096164
+2025-04-27       91                 0  False   184.427657
+2025-05-04       78                 0  False   130.212124
+2025-05-11       64                 0  False    91.325755
+2025-05-18       42                 0  False    75.271050
+2025-05-25       53                 0  False    66.544787
+2025-06-01       34                 0  False    51.384421
+2025-06-08       37                 0  False    48.898823
+2025-06-15       14                 0  False    51.795232
+[2025-07-01 00:13:49,141] [INFO]              end_date mmwr_week  ...  threshold    expected
+2019-12-29 2020-01-04         1  ...        NaN  133.980916
+2020-01-05 2020-01-11         2  ...        NaN  133.980916
+2020-01-12 2020-01-18         3  ...        NaN  133.980916
+2020-01-19 2020-01-25         4  ...        NaN  133.980916
+2020-01-26 2020-02-01         5  ...        NaN  133.980916
+...               ...       ...  ...        ...         ...
+2025-05-18 2025-05-24        21  ...  75.271050  133.980916
+2025-05-25 2025-05-31        22  ...  66.544787  133.980916
+2025-06-01 2025-06-07        23  ...  51.384421  133.980916
+2025-06-08 2025-06-14        24  ...  48.898823  133.980916
+2025-06-15 2025-06-21        25  ...  51.795232  133.980916
+
+[286 rows x 6 columns]
+[2025-07-01 00:13:50,073] [INFO] Plot saved to: farrington_death_plot_fec5311e.png
+[2025-07-01 00:13:50,074] [INFO] Response data: {'graph': {'Model': 'Farrington', 'DataSource': 'Flu Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Flu Death Plot', 'TrainEndDate': '2024-12-30'}, 'status': 'processed', 'message': 'Plot generated successfully.', 'plot_path': 'farrington_death_plot_fec5311e.png'}
+[2025-07-01 00:13:50,075] [INFO] 127.0.0.1 - - [01/Jul/2025 00:13:50] "POST /epyapi HTTP/1.1" 200 -
+[2025-07-01 00:15:11,356] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Pneumonia Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Pneumonia Deaths Plot', 'TrainEndDate': '2024-12-30'}}
+[2025-07-01 00:15:11,356] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Pneumonia Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Pneumonia Deaths Plot', 'TrainEndDate': '2024-12-30'}
+[2025-07-01 00:15:11,356] [INFO] Model: Farrington, DataSource: Pneumonia Deaths, Title: CDC Pneumonia Deaths Plot, YearBack: 3,                 UseTrainSplit: False, Threshold: 1000, TrainSplitRatio: 0.7
+[2025-07-01 00:15:11,356] [INFO] Using TrainEndDate: 2024-12-30 00:00:00
+[2025-07-01 00:15:11,356] [INFO] Output plot path: farrington_death_plot_03e27507.png
+[2025-07-01 00:15:11,356] [INFO] Pneumonia Deaths
+[2025-07-01 00:15:13,846] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:15:13,881] [INFO]              end_date mmwr_week  n_cases  n_outbreak_cases
+2019-12-29 2020-01-04         1     4111              3111
+2020-01-05 2020-01-11         2     4153              3153
+2020-01-12 2020-01-18         3     4066              3066
+2020-01-19 2020-01-25         4     3915              2915
+2020-01-26 2020-02-01         5     3818              2818
+...               ...       ...      ...               ...
+2025-05-18 2025-05-24        21     2916              1916
+2025-05-25 2025-05-31        22     2871              1871
+2025-06-01 2025-06-07        23     2704              1704
+2025-06-08 2025-06-14        24     2070              1070
+2025-06-15 2025-06-21        25     1112               112
+
+[286 rows x 4 columns]
+[2025-07-01 00:15:13,882] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2025-04-13', '2025-04-20', '2025-04-27', '2025-05-04',
+               '2025-05-11', '2025-05-18', '2025-05-25', '2025-06-01',
+               '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', length=286, freq='W-SUN')
+[2025-07-01 00:15:13,883] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2025-04-13', '2025-04-20', '2025-04-27', '2025-05-04',
+               '2025-05-11', '2025-05-18', '2025-05-25', '2025-06-01',
+               '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', length=286, freq='W-SUN')
+[2025-07-01 00:15:13,888] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2024-10-27', '2024-11-03', '2024-11-10', '2024-11-17',
+               '2024-11-24', '2024-12-01', '2024-12-08', '2024-12-15',
+               '2024-12-22', '2024-12-29'],
+              dtype='datetime64[ns]', length=262, freq='W-SUN')
+[2025-07-01 00:15:13,888] [INFO] Train size: 262 Test size: 24
+[2025-07-01 00:15:13,889] [INFO] DatetimeIndex(['2025-01-05', '2025-01-12', '2025-01-19', '2025-01-26',
+               '2025-02-02', '2025-02-09', '2025-02-16', '2025-02-23',
+               '2025-03-02', '2025-03-09', '2025-03-16', '2025-03-23',
+               '2025-03-30', '2025-04-06', '2025-04-13', '2025-04-20',
+               '2025-04-27', '2025-05-04', '2025-05-11', '2025-05-18',
+               '2025-05-25', '2025-06-01', '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', freq='W-SUN')
+[2025-07-01 00:15:13,890] [INFO] Fitting FarringtonFlexible model... FarringtonFlexible(years_back=3, window_half_width=3, reweight=True, weights_threshold=2.58, alpha=0.05, trend=True, trend_threshold=0.05, past_period_cutoff=4, min_cases_in_past_periods=5, power_transform='2/3', past_weeks_not_included=26, threshold_method='delta')
+[2025-07-01 00:15:13,891] [INFO] Model fitting complete.
+[2025-07-01 00:15:14,175] [INFO] Predictions:             n_cases  n_outbreak_cases  alarm  upperbound
+2025-01-05     4660              3660   True  1052.46319
+2025-01-12     4832              3832   True  1052.46319
+2025-01-19     4742              3742   True  1052.46319
+2025-01-26     4586              3586   True  1052.46319
+2025-02-02     4739              3739   True  1052.46319
+2025-02-09     4425              3425   True  1052.46319
+2025-02-16     4537              3537   True  1052.46319
+2025-02-23     4464              3464   True  1052.46319
+2025-03-02     4232              3232   True  1052.46319
+2025-03-09     4026              3026   True  1052.46319
+2025-03-16     3780              2780   True  1052.46319
+2025-03-23     3807              2807   True  1052.46319
+2025-03-30     3498              2498   True  1052.46319
+2025-04-06     3493              2493   True  1052.46319
+2025-04-13     3485              2485   True  1052.46319
+2025-04-20     3376              2376   True  1052.46319
+2025-04-27     3247              2247   True  1052.46319
+2025-05-04     3230              2230   True  1052.46319
+2025-05-11     3039              2039   True  1052.46319
+2025-05-18     2916              1916   True  1052.46319
+2025-05-25     2871              1871   True  1052.46319
+2025-06-01     2704              1704   True  1052.46319
+2025-06-08     2070              1070   True  1052.46319
+2025-06-15     1112               112   True  1052.46319
+[2025-07-01 00:15:14,188] [INFO]              end_date mmwr_week  ...   threshold    expected
+2019-12-29 2020-01-04         1  ...         NaN  5385.21374
+2020-01-05 2020-01-11         2  ...         NaN  5385.21374
+2020-01-12 2020-01-18         3  ...         NaN  5385.21374
+2020-01-19 2020-01-25         4  ...         NaN  5385.21374
+2020-01-26 2020-02-01         5  ...         NaN  5385.21374
+...               ...       ...  ...         ...         ...
+2025-05-18 2025-05-24        21  ...  1052.46319  5385.21374
+2025-05-25 2025-05-31        22  ...  1052.46319  5385.21374
+2025-06-01 2025-06-07        23  ...  1052.46319  5385.21374
+2025-06-08 2025-06-14        24  ...  1052.46319  5385.21374
+2025-06-15 2025-06-21        25  ...  1052.46319  5385.21374
+
+[286 rows x 6 columns]
+[2025-07-01 00:15:14,826] [INFO] Plot saved to: farrington_death_plot_03e27507.png
+[2025-07-01 00:15:14,827] [INFO] Response data: {'graph': {'Model': 'Farrington', 'DataSource': 'Pneumonia Deaths', 'YearBack': '3', 'UseTrainSplit': False, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '1000', 'Title': 'CDC Pneumonia Deaths Plot', 'TrainEndDate': '2024-12-30'}, 'status': 'processed', 'message': 'Plot generated successfully.', 'plot_path': 'farrington_death_plot_03e27507.png'}
+[2025-07-01 00:15:14,828] [INFO] 127.0.0.1 - - [01/Jul/2025 00:15:14] "POST /epyapi HTTP/1.1" 200 -
+[2025-07-01 00:16:07,146] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Covid-19 Tests', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '10', 'Title': 'CDC Covid 19 Test History Plot', 'TrainSplitRatio': '0.8'}}
+[2025-07-01 00:16:07,146] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Covid-19 Tests', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '10', 'Title': 'CDC Covid 19 Test History Plot', 'TrainSplitRatio': '0.8'}
+[2025-07-01 00:16:07,146] [INFO] Model: Farrington, DataSource: Covid-19 Tests, Title: CDC Covid 19 Test History Plot, YearBack: 3,                 UseTrainSplit: True, Threshold: 10, TrainSplitRatio: 0.8
+[2025-07-01 00:16:07,147] [INFO] Output plot path: farrington_covid19test_plot_01b60c7b.png
+[2025-07-01 00:16:07,147] [INFO] Covid-19 Tests
+[2025-07-01 00:16:07,147] [INFO] Using local data source for COVID-19 test data.
+[2025-07-01 00:16:07,155] [INFO] Splitting data: 1748 training points, 437 testing points.
+[2025-07-01 00:16:07,155] [INFO] Fitting FarringtonFlexible model...
+[2025-07-01 00:16:07,156] [INFO] Model fitting complete.
+[2025-07-01 00:16:07,156] [INFO] Making predictions...
+[2025-07-01 00:16:11,153] [INFO] Predictions complete.
+[2025-07-01 00:16:11,795] [INFO] Plot saved successfully to: farrington_covid19test_plot_01b60c7b.png
+[2025-07-01 00:16:11,795] [INFO] Response data: {'graph': {'Model': 'Farrington', 'DataSource': 'Covid-19 Tests', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '10', 'Title': 'CDC Covid 19 Test History Plot', 'TrainSplitRatio': '0.8'}, 'status': 'processed', 'message': 'Plot generated successfully.', 'plot_path': 'farrington_covid19test_plot_01b60c7b.png'}
+[2025-07-01 00:16:11,797] [INFO] 127.0.0.1 - - [01/Jul/2025 00:16:11] "POST /epyapi HTTP/1.1" 200 -
+[2025-07-01 00:16:54,675] [INFO] Received JSON data: {'graph': {'Model': 'Farrington', 'DataSource': 'Covid-19 Deaths', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '100', 'Title': 'Covid 19 Death Plot', 'TrainSplitRatio': '0.8'}}
+[2025-07-01 00:16:54,675] [INFO] Graph type: {'Model': 'Farrington', 'DataSource': 'Covid-19 Deaths', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '100', 'Title': 'Covid 19 Death Plot', 'TrainSplitRatio': '0.8'}
+[2025-07-01 00:16:54,676] [INFO] Model: Farrington, DataSource: Covid-19 Deaths, Title: Covid 19 Death Plot, YearBack: 3,                 UseTrainSplit: True, Threshold: 100, TrainSplitRatio: 0.8
+[2025-07-01 00:16:54,676] [INFO] Output plot path: farrington_death_plot_7b0804c0.png
+[2025-07-01 00:16:54,676] [INFO] Covid-19 Deaths
+[2025-07-01 00:16:56,817] [INFO] CDC DataFrame:                     data_as_of               start_date  ... footnote month
+0      2025-06-26T00:00:00.000  2019-12-29T00:00:00.000  ...      NaN   NaN
+1      2025-06-26T00:00:00.000  2020-01-05T00:00:00.000  ...      NaN   NaN
+2      2025-06-26T00:00:00.000  2020-01-12T00:00:00.000  ...      NaN   NaN
+3      2025-06-26T00:00:00.000  2020-01-19T00:00:00.000  ...      NaN   NaN
+4      2025-06-26T00:00:00.000  2020-01-26T00:00:00.000  ...      NaN   NaN
+...                        ...                      ...  ...      ...   ...
+19381  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19382  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19383  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19384  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+19385  2025-06-26T00:00:00.000  2020-01-01T00:00:00.000  ...      NaN   NaN
+
+[19386 rows x 17 columns]
+[2025-07-01 00:16:56,855] [INFO]              end_date mmwr_week  n_cases  n_outbreak_cases
+2019-12-29 2020-01-04         1        0                 0
+2020-01-05 2020-01-11         2        1                 0
+2020-01-12 2020-01-18         3        2                 0
+2020-01-19 2020-01-25         4        3                 0
+2020-01-26 2020-02-01         5        0                 0
+...               ...       ...      ...               ...
+2025-05-18 2025-05-24        21      188                88
+2025-05-25 2025-05-31        22      194                94
+2025-06-01 2025-06-07        23      165                65
+2025-06-08 2025-06-14        24      116                16
+2025-06-15 2025-06-21        25       70                 0
+
+[286 rows x 4 columns]
+[2025-07-01 00:16:56,856] [INFO] DatetimeIndex(['2019-12-29', '2020-01-05', '2020-01-12', '2020-01-19',
+               '2020-01-26', '2020-02-02', '2020-02-09', '2020-02-16',
+               '2020-02-23', '2020-03-01',
+               ...
+               '2025-04-13', '2025-04-20', '2025-04-27', '2025-05-04',
+               '2025-05-11', '2025-05-18', '2025-05-25', '2025-06-01',
+               '2025-06-08', '2025-06-15'],
+              dtype='datetime64[ns]', length=286, freq='W-SUN')
+[2025-07-01 00:16:58,009] [INFO] Plot saved to: farrington_death_plot_7b0804c0.png
+[2025-07-01 00:16:58,010] [INFO] Response data: {'graph': {'Model': 'Farrington', 'DataSource': 'Covid-19 Deaths', 'YearBack': '3', 'UseTrainSplit': True, 'BeginDate': '2025-07-01', 'Freq': 'By Week', 'Threshold': '100', 'Title': 'Covid 19 Death Plot', 'TrainSplitRatio': '0.8'}, 'status': 'processed', 'message': 'Plot generated successfully.', 'plot_path': 'farrington_death_plot_7b0804c0.png'}
+[2025-07-01 00:16:58,010] [INFO] 127.0.0.1 - - [01/Jul/2025 00:16:58] "POST /epyapi HTTP/1.1" 200 -
+[2025-07-01 00:30:04,810] [INFO]  * Detected change in 'C:\\Users\\taohe\\Documents\\PyProjects\\epyflaServer.py', reloading
