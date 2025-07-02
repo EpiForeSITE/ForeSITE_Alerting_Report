@@ -239,4 +239,4 @@ Contributions are welcome! Please follow these steps:
 
 ## Contact
 
-For issues or feature requests, please open an issue on GitHub or contact Dr. Makoto Jones(makoto.jones@hsc.utah.edu) and [Tao.He@utah.edu](mailto:tao.he@utah.edu).
+For issues or feature requests, please open an issue on GitHub or contact [Dr. Makoto Jones](mailto:makoto.jones@hsc.utah.edu) and [Tao He](mailto:tao.he@utah.edu).
