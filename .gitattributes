@@ -1,0 +1,3 @@
+*.cs linguist-detectable
+*.ipynb linguist-documentation
+*.py linguist-detectable
