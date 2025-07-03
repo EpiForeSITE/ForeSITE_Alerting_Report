@@ -11,7 +11,7 @@ import os
 import numpy as np
 from epysurv.models.timepoint import FarringtonFlexible
 import matplotlib.pyplot as plt
-
+import warnings
 import requests
 from sodapy import Socrata
 
@@ -31,20 +31,31 @@ app = Flask(__name__)
 # Define the port the application will run on
 PORT = 5001 # Using 5001 to avoid potential conflicts with default 5000
 
-# 设置日志文件路径（与你 C# 中的 logPath 一致）
-log_file_path = os.path.join(os.path.dirname(__file__), 'flask_py_log.txt')
+warnings.filterwarnings("ignore", category=FutureWarning)
 
-# 配置日志
+documents_path = os.path.join(os.path.expanduser("~"), "Documents")
+log_file_path = os.path.join(documents_path, "flask_py_log.txt")
+save_folder = os.path.join(documents_path, "ForeSITEAlertingReportFiles")
+
+# Ensure the directory exists and create the log file
+os.makedirs(documents_path, exist_ok=True)
+os.makedirs(save_folder, exist_ok=True)
+
+if not os.path.exists(log_file_path):
+    with open(log_file_path, 'a', encoding='utf-8') as f:
+        pass  # Create an empty file
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [%(levelname)s] %(message)s',
     handlers=[
         logging.FileHandler(log_file_path, mode='a', encoding='utf-8'),
-        logging.StreamHandler()  # 仍然允许 stdout 输出（可被 C# 读）
+        logging.StreamHandler()  # Also log to console
     ]
 )
 
-# 替换 print，使 print 内容也进入日志
+# Replace print so that print output also goes to the log
 def print(*args, **kwargs):
     logging.info(' '.join(str(arg) for arg in args))
 
@@ -521,7 +532,7 @@ def process_json():
     else f"farrington_death_plot_{unique_id}.png")
     print(f"Output plot path: {output_plot_path}")
 
-
+    save_img = os.path.join(save_folder, output_plot_path) 
     try:
         # 7. 根据数据源处理数据
         print(datasource)
@@ -533,7 +544,7 @@ def process_json():
             #print(df2020)
             generate_plot_from_data(
                 df=df2020,
-                save_path=output_plot_path,
+                save_path=save_img,
                 train_split_ratio=trainSplitRatio,
                 alpha=0.05,
                 years_back=yearback,
@@ -575,7 +586,7 @@ def process_json():
 
             plot_farrington_results(
                 df_full, predictions, train,
-                save_path=output_plot_path,
+                save_path=save_img,
                 alpha=0.05,
                 plot_title=title,
                 xlabel='Date',
@@ -590,7 +601,8 @@ def process_json():
     response_data.update({
         'status': 'processed',
         'message': 'Plot generated successfully.',
-        'plot_path': output_plot_path
+        'plot_path':  save_img,
+
     })
 
     print(f"Response data: {response_data}")
