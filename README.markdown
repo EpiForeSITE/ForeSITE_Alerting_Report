@@ -45,7 +45,7 @@ The application allows users to build surveillance models with configurable slid
 - **TODO: Administrative Privileges**: Required for creating scheduled tasks
 -
 
-## Installation
+## Installation From Source Code
 
 ### 1. Clone the Repository
 ```bash
@@ -67,27 +67,19 @@ cd ForeSITE-Alerting-Report
      dotnet build
      ```
 
-### 3. Set Up the Flask Server
-1. **Navigate to the Flask Server Directory**:
-   - Assumes a `server` folder in the repository with the Flask application (e.g., `app.py`).
-   ```bash
-   cd server
-   ```
-2. **Create a Python Virtual Environment**:
-   ```bash
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-3. **Install Dependencies**:
-   - Install Flask and `epySurv` (replace with actual dependencies if `epySurv` is custom):
+### 3. Set Up the epySurv envrionment
+
+   - [epySurv](https://github.com/JarnoRFB/epysurv) for epySurv Setup
+
+### 4. Set Up the Flask Server
+
+1. **Install Dependencies**:
+   - Install Flask :
      ```bash
-     pip install flask pandas matplotlib epySurv
+     pip install flask pandas matplotlib 
      ```
-   - Create a `requirements.txt` if provided:
-     ```bash
-     pip install -r requirements.txt
-     ```
-4. **Just for test: Run the Flask Server**:
+  
+2. **Just for test: Run the Flask Server**:
    - Start the server at `http://127.0.0.1:5001`:
      ```bash
      python app.py
@@ -95,11 +87,24 @@ cd ForeSITE-Alerting-Report
      Our Application doesn't need to call the Flask Server manually. it will be called by app into the background.
 
 
-### 4. Run the Application
+### 5. Run the Application
 - Run the WPF application as administrator to enable task scheduling:
   ```bash
   dotnet run --project ForeSITETestApp
   ```
+
+## Installation From Release Version 
+
+This release includes the ForeSITE Alerting Report application, featuring integrated Python-based surveillance data processing envrionment and .Net 8 runtime. Key components:
+
+**Python Environment**: Includes the epysurv-env virtual environment with all required dependencies (e.g., rpy2, pandas, Flask) pre-configured for seamless operation.
+**.NET Runtime**: Bundled with the .NET 8 runtime to support the WPF application. If the runtime fails to work on your system, please install the .NET 8 runtime manually from the official .NET website.
+
+### Setup
+- Download and extract the release archive.
+- Run ForeSITEAlertingReport.exe from the extracted folder.
+
+- Logs and generated files will be saved to C:\Users\<YourUsername>\Documents\ForeSITEAlertingReportFiles.
 
 ## Usage
 
@@ -119,7 +124,7 @@ cd ForeSITE-Alerting-Report
    - Click "Save" to generate a PDF report (`Report.pdf`) via a file dialog.
 
 
-### Importing Custom Data
+### TODO: Importing Custom Data
 1. Navigate to the "Data Source Manager" tab.
 2. Add a new data source:
    - Enter name, app token, and API URL (if connecting to a custom server).
@@ -133,7 +138,7 @@ cd ForeSITE-Alerting-Report
 2. Delete data sources:
    - Select sources and click "Delete".
 
-### Scheduling Automated Reports
+### TODO: Scheduling Automated Reports
 1. Navigate to the "Scheduler" tab.
 2. Click "Scheduling" to create a Windows Task Scheduler task:
    - **Task Name**: `MonthlyReportGeneration`
@@ -145,7 +150,7 @@ cd ForeSITE-Alerting-Report
 
 ## Flask Server
 
-The Flask server (`server/app.py`) handles:
+The Flask server (`epyflaServer.py`) handles:
 - **API Endpoint**: `http://127.0.0.1:5001/epyapi` for plot generation.
 - **epySurv Integration**: Processes CDC public surveillance data or user-imported data using the `epySurv` module.
 - **Data Processing**: Generates plot images returned to the WPF application.
