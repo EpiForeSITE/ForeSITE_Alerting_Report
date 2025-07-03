@@ -200,7 +200,7 @@ namespace ForeSITETestApp
 
         private void SchedulingButton_Click(object sender, RoutedEventArgs e)
         {
-
+            MessageBox.Show("TODO: Scheduling function soon ^_^", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
       
@@ -528,6 +528,24 @@ namespace ForeSITETestApp
             RedrawCanvas();
         }
 
+        private XFont GetSafeFont(string preferredFont, double size, XFontStyleEx style = XFontStyleEx.Regular)
+        {
+            string[] fallbackFonts = { preferredFont, "Helvetica", "Times New Roman" };
+            foreach (var fontName in fallbackFonts)
+            {
+                try
+                {
+                    return new XFont(fontName, size, style);
+                }
+                catch
+                {
+                    // Continue to try the next font
+                }
+            }
+            // Ultimate fallback: use a generic font with default style
+            return new XFont("Helvetica", size, XFontStyleEx.Regular); // PdfSharpCore may handle this gracefully
+        }
+
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -648,8 +666,9 @@ namespace ForeSITETestApp
                         {
                             double left = Canvas.GetLeft(placeholderTextBlock);
                             double top = Canvas.GetTop(placeholderTextBlock);
+                            XFont placeholderFont = GetSafeFont("Arial", 14);
                             gfx.DrawString(placeholderTextBlock.Text,
-                                new XFont("Arial", 14),
+                                placeholderFont,
                                 new XSolidBrush(XColor.FromArgb(Colors.Gray.A, Colors.Gray.R, Colors.Gray.G, Colors.Gray.B)),
                                 left, top + 14);
                         }
@@ -679,7 +698,7 @@ namespace ForeSITETestApp
                                     string text = new TextRange(titleTextBlock.ContentStart, titleTextBlock.ContentEnd).Text.Trim();
                                     double textLeft = borderLeft + 5;
                                     double textTop = borderTop + borderHeight / 2;
-                                    XFont font = new XFont("Arial", 16);
+                                    //XFont font = new XFont("Arial", 16);
 
                                     if (titleTextBlock.Inlines.Any())
                                     {
@@ -706,8 +725,9 @@ namespace ForeSITETestApp
                                     }
                                     else
                                     {
+                                        XFont defaultFont = GetSafeFont("Arial", 16);
                                         gfx.DrawString(text,
-                                            font,
+                                            defaultFont,
                                             new XSolidBrush(XColor.FromArgb(Colors.Gray.A, Colors.Gray.R, Colors.Gray.G, Colors.Gray.B)),
                                             textLeft, textTop);
                                     }
@@ -874,7 +894,7 @@ namespace ForeSITETestApp
                         if (status?.ToLower() == "processed" && !string.IsNullOrEmpty(filePath))
                         {
                             // Validate file existence
-                            var file = "C:\\Users\\taohe\\Documents\\PyProjects\\" + filePath;
+                            var file =  filePath;
                             if (!File.Exists(file))
                             {
                                 MessageBox.Show($"Plot file not found at '{filePath}'.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1083,6 +1103,11 @@ namespace ForeSITETestApp
                 TrainSplitRatioInput.Visibility = Visibility.Collapsed;
                 DatePickersPanel.Visibility = Visibility.Visible;
             }
+        }
+
+        private void AddCommentButton_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show("TODO: Comment function soon^_^", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 }

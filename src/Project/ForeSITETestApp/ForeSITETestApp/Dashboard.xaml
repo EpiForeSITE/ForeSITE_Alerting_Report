@@ -253,7 +253,7 @@
                                     <!-- Action Buttons -->
                                     <StackPanel Grid.Row="0" Grid.Column="4" Grid.RowSpan="3" Orientation="Vertical" Margin="10,0,0,0" VerticalAlignment="Center">
                                         <Button x:Name="AddTitleButton" Content="Add Title"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
-                                        <Button x:Name="AddCommentButton" Content="Add Comment"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
+                                        <Button x:Name="AddCommentButton" Content="Add Comment"  Margin="0,0,0,10" Click="AddCommentButton_Click" />
                                         <Button x:Name="AddPlotButton" Content="Add Plot" Click="AddPlotButton_ClickAsync" />
                                     </StackPanel>
                                 </Grid>
