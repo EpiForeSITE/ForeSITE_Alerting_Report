@@ -18,7 +18,7 @@
 
 In the current version, we fully support four CDC data sources, including:
 
-- **COVID-19 Testing**
+- **COVID-19 Testing** （only 2020 CDC Covid Testing data;)
 - **Real-time Deaths (COVID-19, Pneumonia, and Influenza)**
 
 The application allows users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
@@ -224,6 +224,7 @@ The application uses **CDC public surveillance data** for demonstration purposes
   - Ensure the server is running at `http://127.0.0.1:5001` before adding plots.
   - Check Python dependencies: `pip list` and install missing packages.
 - **Plots Not Generated**:
+  - Verify the **Year Back** parameter. if user doesn't have 5 years history data, please set to 3 
   - Verify the Flask server is running and accessible.
   - Ensure data source configuration (CDC or custom) is correct.
   - Check `epySurv` module documentation for specific requirements.
