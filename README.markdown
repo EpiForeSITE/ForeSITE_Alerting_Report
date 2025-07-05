@@ -186,7 +186,7 @@ ForeSITE-Alerting-Report/
 │   ├── ReportElement.cs       # Report element model
 │   ├── PlotTitleDialog.xaml   # Dialog for plot titles
 │   └── ForeSITETestApp.sln    # Solution file
-├── server/
+├── Python/
 │   ├── epyflaServer.py        # Flask server for epySurv integration
 │   └── requirements.txt       # Python dependencies
 │   
