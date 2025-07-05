@@ -21,6 +21,7 @@ using PdfSharp.Pdf;
 using PdfSharp.Drawing;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
+using PdfSharp.Fonts;
 
 namespace ForeSITETestApp
 {
@@ -35,16 +36,23 @@ namespace ForeSITETestApp
         private List<ReportElement> _reportElements; // Track all elements
         private RichTextEditorWindow? _editorWindow;
         private FlowDocument? _titleDocument; // Store the rich text document
+
+        private TextBlock? _placeholderTextBlock; // Class-level field
+        
+
         public Dashboard(MainWindow window)
         {
             InitializeComponent();
             this.window = window;
-            _httpClient = new HttpClient();
+            _httpClient = window.getHttpClient();
             _reportElements = new List<ReportElement>(); // Initialize report elements list
             InitializeDataSources();
             // Initialize default FlowDocument
             _titleDocument = new FlowDocument(new Paragraph(new Run("Click to edit title")));
-            DrawingCanvas.Height = 300; // Minimum height for placeholder         
+            // Set custom font resolver
+            GlobalFontSettings.FontResolver = new CustomFontResolver();
+            DrawingCanvas.Height = 300; // Minimum height for placeholder
+            CheckAndManagePlaceholder();
         }
 
         private void InitializeDataSources()
@@ -123,7 +131,37 @@ namespace ForeSITETestApp
                 MessageBox.Show($"Error sending JSON message: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-       
+
+        private void CheckAndManagePlaceholder()
+        {
+            if (DrawingCanvas.Children.Count == 0)
+            {
+                if (_placeholderTextBlock == null)
+                {
+                    _placeholderTextBlock = new TextBlock
+                    {
+                        Text = "Drawing Area Placeholder",
+                        Foreground = Brushes.Gray,
+                        FontSize = 14,
+                        TextAlignment = TextAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    // Center the placeholder (adjust based on canvas size)
+                    Canvas.SetLeft(_placeholderTextBlock, (DrawingCanvas.ActualWidth - _placeholderTextBlock.ActualWidth) / 2);
+                    Canvas.SetTop(_placeholderTextBlock, (DrawingCanvas.ActualHeight - _placeholderTextBlock.ActualHeight) / 2);
+                    if (DrawingCanvas.ActualWidth == 0 || DrawingCanvas.ActualHeight == 0)
+                    {
+                        DrawingCanvas.SizeChanged += (s, e) => CheckAndManagePlaceholder();
+                    }
+                    DrawingCanvas.Children.Add(_placeholderTextBlock);
+                }
+            }
+            else if (_placeholderTextBlock != null)
+            {
+                DrawingCanvas.Children.Remove(_placeholderTextBlock);
+                _placeholderTextBlock = null;
+            }
+        }
 
         private void AIButton_Click(object sender, RoutedEventArgs e)
         {
@@ -305,6 +343,7 @@ namespace ForeSITETestApp
                 _reportElements.RemoveAll(re => re.Element == titleBorder);
                 _titleDocument = new FlowDocument(new Paragraph(new Run("Click to edit title")));
                 RedrawCanvas();
+                CheckAndManagePlaceholder();
             };
 
             // Add TextBlock and Delete Button to Grid
@@ -526,6 +565,7 @@ namespace ForeSITETestApp
 
             // Redraw canvas
             RedrawCanvas();
+            CheckAndManagePlaceholder();
         }
 
         private XFont GetSafeFont(string preferredFont, double size, XFontStyleEx style = XFontStyleEx.Regular)
@@ -550,6 +590,12 @@ namespace ForeSITETestApp
         {
             try
             {
+                if (DrawingCanvas.Children.Count == 0 || _reportElements.Count == 0)
+                {
+                    MessageBox.Show("Please add at least one report element before saving.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
                 // Ensure title is in TextBlock state (not RichTextBox)  
                 var titleElement = _reportElements.FirstOrDefault(re => re.Type == ReportElementType.Title);
                 if (titleElement != null && titleElement.Element?.Child is Grid contentGrid) // Added null check for Element  
@@ -659,20 +705,6 @@ namespace ForeSITETestApp
                     gfx.DrawRectangle(new XSolidBrush(XColor.FromArgb(bgColor.A, bgColor.R, bgColor.G, bgColor.B)),
                         0, 0, canvasWidth, canvasHeight);
 
-                    // Draw placeholder TextBlock
-                    foreach (var child in DrawingCanvas.Children)
-                    {
-                        if (child is TextBlock placeholderTextBlock && placeholderTextBlock.Text == "Drawing Area Placeholder")
-                        {
-                            double left = Canvas.GetLeft(placeholderTextBlock);
-                            double top = Canvas.GetTop(placeholderTextBlock);
-                            XFont placeholderFont = GetSafeFont("Arial", 14);
-                            gfx.DrawString(placeholderTextBlock.Text,
-                                placeholderFont,
-                                new XSolidBrush(XColor.FromArgb(Colors.Gray.A, Colors.Gray.R, Colors.Gray.G, Colors.Gray.B)),
-                                left, top + 14);
-                        }
-                    }
 
                     // Draw report elements
                     foreach (var element in _reportElements)
@@ -698,7 +730,6 @@ namespace ForeSITETestApp
                                     string text = new TextRange(titleTextBlock.ContentStart, titleTextBlock.ContentEnd).Text.Trim();
                                     double textLeft = borderLeft + 5;
                                     double textTop = borderTop + borderHeight / 2;
-                                    //XFont font = new XFont("Arial", 16);
 
                                     if (titleTextBlock.Inlines.Any())
                                     {
@@ -725,15 +756,13 @@ namespace ForeSITETestApp
                                     }
                                     else
                                     {
-                                        XFont defaultFont = GetSafeFont("Arial", 16);
+                                        XFont defaultFont = new XFont("Arial", 16);
                                         gfx.DrawString(text,
                                             defaultFont,
-                                            new XSolidBrush(XColor.FromArgb(Colors.Gray.A, Colors.Gray.R, Colors.Gray.G, Colors.Gray.B)),
+                                            new XSolidBrush(XColor.FromArgb(Colors.Black.A, Colors.Black.R, Colors.Black.G, Colors.Black.B)),
                                             textLeft, textTop);
                                     }
                                 }
-
-                               
                             }
                             else // Plot
                             {
@@ -769,8 +798,6 @@ namespace ForeSITETestApp
                                         MessageBox.Show($"Error rendering image to PDF: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                                     }
                                 }
-
-                                
                             }
                         }
                     }
@@ -799,6 +826,8 @@ namespace ForeSITETestApp
                 {
                     return; // Cancelled
                 }
+
+                
 
                 string plotTitle = dialog.PlotTitle;
 
@@ -991,6 +1020,7 @@ namespace ForeSITETestApp
                             {
                                 _reportElements.RemoveAll(re => re.Element == imageBorder);
                                 RedrawCanvas();
+                                CheckAndManagePlaceholder();
                             };
 
                             // Add Image and Delete Button to Grid
@@ -1013,6 +1043,7 @@ namespace ForeSITETestApp
 
                             // Redraw canvas
                             RedrawCanvas();
+                            CheckAndManagePlaceholder();
 
                             MessageBox.Show($"Plot '{plotTitle}' added for model {model} from '{filePath}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -1051,13 +1082,9 @@ namespace ForeSITETestApp
 
         private void RedrawCanvas()
         {
-            // Preserve placeholder
-            var placeholder = DrawingCanvas.Children.OfType<TextBlock>().FirstOrDefault(t => t.Text == "Drawing Area Placeholder");
+           
             DrawingCanvas.Children.Clear();
-            if (placeholder != null)
-            {
-                DrawingCanvas.Children.Add(placeholder);
-            }
+            
 
             double topPosition = 0;
             double canvasWidth = Math.Max(DrawingCanvas.ActualWidth, 778); // Ensure canvas is wide enough

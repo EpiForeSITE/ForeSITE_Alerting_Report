@@ -7,8 +7,10 @@
 
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json.Linq;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Media.Imaging;
 
@@ -23,12 +25,13 @@ public partial class MainWindow : Window
 
     private Dashboard dashboard;
     private Process? flaskProcess; // Declared as nullable to fix CS8618
+    private readonly HttpClient _httpClient;
     private readonly string connectionString = "Data Source=mydb.sqlite";
     public MainWindow()
     {
         InitializeComponent();
         //InitializeDatabase();
-
+        _httpClient = new HttpClient();
         this.dashboard = new Dashboard(this);
         //this.MainContent.Content = this.reporter;
         this.MainContent.Content = this.dashboard;
@@ -75,25 +78,118 @@ public partial class MainWindow : Window
         await StartFlaskAndSendRequestAsync();
     }
 
-
-    private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    public HttpClient getHttpClient()
     {
-        if (flaskProcess != null && !flaskProcess.HasExited)
+        return _httpClient;
+    }
+
+
+    private async void Window_Closing(object sender, CancelEventArgs e)
+    {
+        if (flaskProcess != null)
         {
-            flaskProcess.Kill();
+            try
+            {
+                // Attempt graceful shutdown via HTTP POST request
+                try
+                {
+                    HttpResponseMessage response = await _httpClient.PostAsync("http://127.0.0.1:5001/shutdown", null);
+                    response.EnsureSuccessStatusCode(); // Throws if response is not successful
+                    Console.WriteLine("Shutdown request sent successfully.");
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"Failed to send shutdown request: {ex.Message}");
+                }
+                catch (TaskCanceledException)
+                {
+                    Console.WriteLine("Shutdown request timed out.");
+                }
+
+                // Wait for the process to exit gracefully
+                if (!flaskProcess.HasExited)
+                {
+                    flaskProcess.WaitForExit(3000); // Wait up to 3 seconds for graceful exit
+                }
+
+                // If still running, forcefully kill the process and its children
+                if (!flaskProcess.HasExited)
+                {
+                    Console.WriteLine("Process did not exit gracefully. Forcing termination...");
+                    KillProcessAndChildren(flaskProcess.Id);
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Handle case where HasExited or process access fails
+                Console.WriteLine($"InvalidOperationException: {ex.Message}");
+                try
+                {
+                    KillProcessAndChildren(flaskProcess.Id); // Attempt to kill using process ID
+                }
+                catch (Exception killEx)
+                {
+                    Console.WriteLine($"Error killing process: {killEx.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle other unexpected errors
+                Console.WriteLine($"Error terminating process: {ex.Message}");
+            }
+            finally
+            {
+                // Clean up resources
+                flaskProcess.Close();
+                flaskProcess = null;
+                _httpClient.Dispose(); // Dispose HttpClient
+            }
+        }
+    }
+
+    private void KillProcessAndChildren(int pid)
+    {
+        try
+        {
+            // Use taskkill to terminate the process and its child processes
+            ProcessStartInfo taskKillInfo = new ProcessStartInfo
+            {
+                FileName = "taskkill",
+                Arguments = $"/PID {pid} /T /F", // /T kills child processes, /F forces termination
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using (Process taskKill = Process.Start(taskKillInfo))
+            {
+                taskKill.WaitForExit();
+                if (taskKill.ExitCode != 0)
+                {
+                    Console.WriteLine($"taskkill failed with exit code {taskKill.ExitCode}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error killing process tree for PID {pid}: {ex.Message}");
         }
     }
 
     private async Task StartFlaskAndSendRequestAsync()
     {
+        // Get the current execution directory
+        string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-        string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+        string configPath = Path.Combine(baseDirectory, "config.json");
+
         dynamic config = new
         {
-            pythonPath = @"C:\Program Files\ForeSITEAlertingReport\epysurv-env\python.exe",
-            scriptPath = @"C:\Program Files\ForeSITEAlertingReport\epyflaServer.py",
+            pythonPath = @"C:\Program Files (x86)\ForeSITEAlertingReport\epysurv-env\python.exe",
+            scriptPath = @"C:\Program Files (x86)\ForeSITEAlertingReport\epyflaServer.py",
             logPath = @"",
-            activateCommand = @"C:\Program Files\ForeSITEAlertingReport\epysurv-env\Scripts\activate.bat",
+            activateCommand = @"C:\Program Files (x86)\ForeSITEAlertingReport\epysurv-env\Scripts\activate.bat",
             envName = "epysurv-dev"
         };
 
@@ -116,8 +212,8 @@ public partial class MainWindow : Window
         }
 
 
-        string pythonPath = config.pythonPath;
-        string scriptPath = config.scriptPath;
+        string pythonPath = Path.Combine(baseDirectory, (string)config.pythonPath);
+        string scriptPath = Path.Combine(baseDirectory, (string)config.scriptPath);
 
         string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         string logPath = Path.Combine(documentsPath, "flask_log.txt");
@@ -128,7 +224,7 @@ public partial class MainWindow : Window
             File.Create(logPath).Close(); // 创建空文件
         }
 
-        string activateCommand = config.activateCommand;
+        string activateCommand = Path.Combine(baseDirectory, (string)config.activateCommand);
         string envName = config.envName;
 
 

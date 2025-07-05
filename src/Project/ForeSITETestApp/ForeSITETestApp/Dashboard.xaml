@@ -199,8 +199,8 @@
                                     <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
                                         <TextBlock Text="Num of years back" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="YearBackSelector" SelectedIndex="0" Width="150" HorizontalAlignment="Left">
-                                            <ComboBoxItem Content="5"/>
                                             <ComboBoxItem Content="3"/>
+                                            <ComboBoxItem Content="5"/>
                                             <ComboBoxItem Content="1"/>
                                         </ComboBox>
                                     </StackPanel>
@@ -263,9 +263,9 @@
                         <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="Report Visualization" FontSize="16" FontWeight="SemiBold"/>
-                                <Canvas x:Name="DrawingCanvas" Height="200" Background="#ECF0F1">
-                                    <TextBlock Text="Drawing Area Placeholder" Foreground="Gray" FontSize="14" Canvas.Left="10" Canvas.Top="90"/>
-                                </Canvas>
+                                <Canvas x:Name="DrawingCanvas" Height="200" Background="#ECF0F1"/>
+
+
 
                             </StackPanel>
                         </Border>
