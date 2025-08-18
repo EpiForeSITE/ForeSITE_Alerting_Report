@@ -3,7 +3,7 @@
 <img src="images/foreSITEAlertingReport_icon2.jpg" alt="ForeSITE Alerting Report Logo" width="200"/>
 
 
-**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and public health professionals.
+**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
 
 ## Features
 
@@ -15,13 +15,21 @@
 - **Rich Text Editing**: Customize report titles with rich text formatting (bold, italic, etc.).
 - **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
+- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with Python code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
 
-In the current version, we fully support four CDC data sources, including:
+## Changelog
 
+### Version 0.6 (August 18, 2025)
+- Added a Jupyter-like notebook for advanced users to perform data analysis at runtime.
+- Users can now add, run, delete, save, and load code cells in a non-modal window.
+- Enhanced integration with Python environment for code execution.
+- Minor bug fixes and performance improvements in report rendering.
+
+### Version 0.5 (July 9, 2024)
+- Supported four CDC data sources, including:
 - **COVID-19 Testing** （only 2020 CDC Covid Testing data;)
 - **Real-time Deaths (COVID-19, Pneumonia, and Influenza)**
-
-The application allows users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
+- Allowed users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
 
 
 ## Prerequisites
@@ -124,7 +132,7 @@ This release includes the ForeSITE Alerting Report application, featuring integr
    - Click "Save" to generate a PDF report (`Report.pdf`) via a file dialog.
 
 
-### TODO: Importing Custom Data
+### Importing Custom Data
 1. Navigate to the "Data Source Manager" tab.
 2. Add a new data source:
    - Enter name, app token, and API URL (if connecting to a custom server).
@@ -206,11 +214,26 @@ ForeSITE-Alerting-Report/
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
 - **TODO: Windows Task Scheduler**: For scheduling automated reports
 
-## Demo Data
-
+## Animation Demo
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
 - Select CDC data as a data source in the "Add Plot" dialog.
+![Alerting_2](images/Alerting_2.gif)
 
+### Advanced Data Analysis with Notebook
+Advanced users can leverage the "Data Analysis" feature to open a Jupyter-like Notebook window for runtime data analysis. This non-modal window allows users to:
+- **Input Python Code**: Utilize a code editor with Python syntax highlighting to write and edit Python scripts.
+- **Dynamic Cell Management**: Add new code cells with the "+ Code" button, delete cells with the "Delete" button, and execute code using the "Run" button (currently a placeholder, with plans for integration with the Python environment).
+- **Save and Load**: Persist notebook content to `Documents\notebook.json` using the "Save" button and reload it with the "Load" button, enabling session continuity.
+- **Real-Time Analysis**: Perform data analysis on CDC public surveillance data or imported custom datasets, enhancing exploratory data analysis capabilities.
+
+This feature is designed for users with Python expertise, providing a flexible environment to experiment with data processing and visualization alongside the application's core reporting functionality.
+![Alerting_3](images/Alerting_3.gif)
+
+### Import customized data set
+![Alerting_4](images/Alerting_4.gif)
+
+
+## Screenshots
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-01.png)
 
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-02.png)
