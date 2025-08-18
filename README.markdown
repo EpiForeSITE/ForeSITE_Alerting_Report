@@ -25,7 +25,7 @@
 - Enhanced integration with Python environment for code execution.
 - Minor bug fixes and performance improvements in report rendering.
 
-### Version 0.5 (July 9, 2024)
+### Version 0.5 (July 9, 2025)
 - Supported four CDC data sources, including:
 - **COVID-19 Testing** （only 2020 CDC Covid Testing data;)
 - **Real-time Deaths (COVID-19, Pneumonia, and Influenza)**
