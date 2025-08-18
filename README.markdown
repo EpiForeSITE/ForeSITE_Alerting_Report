@@ -230,6 +230,7 @@ This feature is designed for users with Python expertise, providing a flexible e
 ![Alerting_3](images/Alerting_3.gif)
 
 ### Import customized data set
+- **Customized Data**: One column with name "date" or "dates" or "start_date", and another column with name "cases" or "n_cases" or "count" or "deaths" or "case_count"
 ![Alerting_4](images/Alerting_4.gif)
 
 
