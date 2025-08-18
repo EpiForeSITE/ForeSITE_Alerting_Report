@@ -26,53 +26,30 @@ public partial class MainWindow : Window
     private Dashboard dashboard;
     private Process? flaskProcess; // Declared as nullable to fix CS8618
     private readonly HttpClient _httpClient;
+    private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
     private readonly string connectionString = "Data Source=mydb.sqlite";
     public MainWindow()
     {
         InitializeComponent();
-        //InitializeDatabase();
-        _httpClient = new HttpClient();
+        DBHelper.InitializeDatabase();
+
+        // HTTP不需要SSL处理器
+        _httpClient = new HttpClient()
+        {
+            BaseAddress = new Uri(SERVER_BASE_URL),
+            Timeout = TimeSpan.FromSeconds(60)
+        };
+
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "NotebookApp/1.0");
+
+
         this.dashboard = new Dashboard(this);
         //this.MainContent.Content = this.reporter;
         this.MainContent.Content = this.dashboard;
 
     }
 
-    private void InitializeDatabase()
-    {
-        // Create or connect to SQLite database
-        using (var connection = new SqliteConnection(connectionString))
-        {
-            connection.Open();
-
-            // Create a table
-            var command = connection.CreateCommand();
-            command.CommandText = @"
-                    CREATE TABLE IF NOT EXISTS Users (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Name TEXT NOT NULL,
-                        Email TEXT
-                    )";
-            command.ExecuteNonQuery();
-
-            // Insert sample data
-            command.CommandText = "INSERT INTO Users (Name, Email) VALUES ($name, $email)";
-            command.Parameters.AddWithValue("$name", "John Doe");
-            command.Parameters.AddWithValue("$email", "john@example.com");
-            command.ExecuteNonQuery();
-
-            // Query data
-            command.CommandText = "SELECT * FROM Users";
-            using (var reader = command.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    // MessageBox.Show($"User: {reader["Name"]}, Email: {reader["Email"]}");
-                }
-            }
-        }
-    }
-
+  
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
         await StartFlaskAndSendRequestAsync();

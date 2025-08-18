@@ -252,9 +252,9 @@
 
                                     <!-- Action Buttons -->
                                     <StackPanel Grid.Row="0" Grid.Column="4" Grid.RowSpan="3" Orientation="Vertical" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <Button x:Name="AddTitleButton" Content="Add Title"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
-                                        <Button x:Name="AddCommentButton" Content="Add Comment"  Margin="0,0,0,10" Click="AddCommentButton_Click" />
-                                        <Button x:Name="AddPlotButton" Content="Add Plot" Click="AddPlotButton_ClickAsync" />
+                                        <Button x:Name="AddTitleButton" Content="Add Title\Comment"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
+                                        <Button x:Name="AddPlotButton" Content="Add Plot" Margin="0,0,0,10" Click="AddPlotButton_ClickAsync" />
+                                        <Button x:Name="AddNotebookButton" Content="Data Analysis"   Click="AddNotebookButton_Click" />
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -287,9 +287,9 @@
                                         <DataGrid x:Name="DataSourceTable" AutoGenerateColumns="False" CanUserAddRows="False" Margin="0,0,0,10" MinHeight="200">
                                             <DataGrid.Columns>
                                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                                                <DataGridTextColumn Header="Data Uri" Binding="{Binding DataUrl}" Width="*"/>
-                                                <DataGridTextColumn Header="Resource Uri" Binding="{Binding ResourceUrl}" Width="*"/>
-                                                <DataGridCheckBoxColumn Header="Real Time" Binding="{Binding isRealtime}" Width="100"/>
+                                                <DataGridTextColumn Header="Data Uri" Binding="{Binding DataURL}" Width="*"/>
+                                                <DataGridTextColumn Header="Resource Uri" Binding="{Binding ResourceURL}" Width="*"/>
+                                                <DataGridCheckBoxColumn Header="Real Time" Binding="{Binding IsRealtime}" Width="100"/>
                                                 <DataGridCheckBoxColumn Header="Select" Binding="{Binding IsSelected}" Width="100"/>
                                             </DataGrid.Columns>
                                         </DataGrid>

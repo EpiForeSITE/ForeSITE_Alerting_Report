@@ -6,22 +6,23 @@
 // -----------------------------------------------------------------------------
 
 
+using Microsoft.Data.Sqlite;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
+using PdfSharp.Drawing;
+using PdfSharp.Fonts;
+using PdfSharp.Pdf;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using PdfSharp.Pdf;
-using PdfSharp.Drawing;
-using Newtonsoft.Json.Linq;
-using System.Text.RegularExpressions;
-using PdfSharp.Fonts;
 
 namespace ForeSITETestApp
 {
@@ -38,8 +39,8 @@ namespace ForeSITETestApp
         private FlowDocument? _titleDocument; // Store the rich text document
 
         private TextBlock? _placeholderTextBlock; // Class-level field
-        
 
+        private NotebookWindow? _notebookWindow;
         public Dashboard(MainWindow window)
         {
             InitializeComponent();
@@ -55,19 +56,16 @@ namespace ForeSITETestApp
             CheckAndManagePlaceholder();
         }
 
+
+
         private void InitializeDataSources()
         {
-            _dataSources = new ObservableCollection<DataSource>
-            {
-                new DataSource { Name = "Covid-19 Tests", DataUrl = "https://data.cdc.gov", ResourceUrl="vbim-akqf", isRealtime=false, IsSelected = false },
-                new DataSource { Name = "Covid-19 Deaths", DataUrl = "https://data.cdc.gov", ResourceUrl="r8kw-7aab", isRealtime=true, IsSelected = false },
-                new DataSource { Name = "Pneumonia Deaths", DataUrl = "https://data.cdc.gov", ResourceUrl="r8kw-7aab", isRealtime=true, IsSelected = false },
-                new DataSource { Name = "Flu Deaths", DataUrl = "https://data.cdc.gov", ResourceUrl="r8kw-7aab", isRealtime=true, IsSelected = false },
-
-            };
+            // Load data sources from the database
+            _dataSources = DBHelper.GetAllDataSources();
             DataSourceTable.ItemsSource = _dataSources;
             DataSourceSelector.ItemsSource = _dataSources; // Bind to DataSourceSelector
         }
+
 
         private void SchedulerButton_Click(object sender, RoutedEventArgs e)
         {
@@ -170,62 +168,392 @@ namespace ForeSITETestApp
 
         }
 
+        // Helper method to add new data source to database
+        private bool AddDataSourceToDatabase(string name, string dataUrl, string resourceUrl, bool isRealtime)
+        {
+           return DBHelper.InsertDataSource(new DataSource
+            {
+                Name = name,
+                DataURL = dataUrl,
+                ResourceURL = resourceUrl,
+                IsRealtime = isRealtime
+            });
+            
+        }
+
+        // Helper method to refresh data sources list
+        private void RefreshDataSourcesList()
+        {
+            try
+            {
+                // Get updated data sources from database
+                var localDataSources = DBHelper.GetAllDataSources();
+
+                // Update _dataSources collection (assuming it exists)
+                if (_dataSources != null)
+                {
+                    _dataSources.Clear();
+                    foreach (var dataSource in localDataSources)
+                    {
+                        _dataSources.Add(new DataSource
+                        {
+                            Name = dataSource.Name,
+                            DataURL = dataSource.DataURL,
+                            ResourceURL = dataSource.ResourceURL,
+                            IsRealtime = dataSource.IsRealtime,
+                            IsSelected = false
+                        });
+                    }
+                }
+
+                // Refresh the data source toolbar if it exists
+                if (_notebookWindow != null)
+                {
+                    _notebookWindow.LoadDataSources();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error refreshing data sources list: {ex.Message}");
+            }
+        }
+
+
         private void AddDataSourceButton_Click(object sender, RoutedEventArgs e)
         {
-            var newTab = new TabItem
+
+            var mainStackPanel = new StackPanel
             {
-                Header = $"New Data Source {DataSourceTabs.Items.Count}",
-                Content = new StackPanel
+                Margin = new Thickness(20),
+                Children = { }
+            };
+
+            // Data Source Name
+            mainStackPanel.Children.Add(new TextBlock
+            {
+                Text = "Data Source Name",
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var nameInput = new TextBox
+            {
+                Name = "DataSourceNameInput",
+                Width = 400,
+                Height = 25,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+            mainStackPanel.Children.Add(nameInput);
+
+            // Real-time Data Radio Buttons
+            mainStackPanel.Children.Add(new TextBlock
+            {
+                Text = "Data Type",
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var realtimePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+
+            var realtimeRadio = new RadioButton
+            {
+                Content = "Real-time Data (API)",
+                Name = "RealtimeRadio",
+                IsChecked = true,
+                Margin = new Thickness(0, 0, 20, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var staticRadio = new RadioButton
+            {
+                Content = "Local Data (CSV File)",
+                Name = "StaticRadio",
+                Margin = new Thickness(0, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            realtimePanel.Children.Add(realtimeRadio);
+            realtimePanel.Children.Add(staticRadio);
+            mainStackPanel.Children.Add(realtimePanel);
+
+            // Real-time Data Fields (initially visible)
+            var realtimeFieldsPanel = new StackPanel
+            {
+                Name = "RealtimeFieldsPanel",
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+
+            realtimeFieldsPanel.Children.Add(new TextBlock
+            {
+                Text = "Data URL",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var dataUrlInput = new TextBox
+            {
+                Name = "DataUrlInput",
+                Width = 400,
+                Height = 25,
+                Margin = new Thickness(0, 0, 0, 10),
+                ToolTip = "Enter the API endpoint URL for real-time data"
+            };
+            realtimeFieldsPanel.Children.Add(dataUrlInput);
+
+            realtimeFieldsPanel.Children.Add(new TextBlock
+            {
+                Text = "Resource URL",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var resourceUrlInput = new TextBox
+            {
+                Name = "ResourceUrlInput",
+                Width = 400,
+                Height = 25,
+                Margin = new Thickness(0, 0, 0, 10),
+                ToolTip = "Enter the resource identifier (e.g., dataset ID)"
+            };
+            realtimeFieldsPanel.Children.Add(resourceUrlInput);
+
+            mainStackPanel.Children.Add(realtimeFieldsPanel);
+
+            // Static Data Fields (initially hidden)
+            var staticFieldsPanel = new StackPanel
+            {
+                Name = "StaticFieldsPanel",
+                Visibility = Visibility.Collapsed,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+
+            staticFieldsPanel.Children.Add(new TextBlock
+            {
+                Text = "CSV File Path",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var filePathPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            var filePathLabel = new Label
+            {
+                Name = "FilePathLabel",
+                Content = "No file selected",
+                Width = 300,
+                Height = 25,
+                Background = Brushes.LightGray,
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(1),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(5, 0, 5, 0)
+            };
+
+            var browseButton = new Button
+            {
+                Content = "Browse...",
+                Width = 80,
+                Height = 25,
+                Margin = new Thickness(10, 0, 0, 0)
+            };
+
+            // Browse button click event
+            browseButton.Click += (s, args) =>
+            {
+                var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Margin = new Thickness(10),
-                    Children =
-                   {
-                       new TextBlock { Text = "Data Source Name", FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,5) },
-                       new TextBox { Name = "DataSourceNameInput", Width = 300, Margin = new Thickness(0,0,0,10) },
-                       new TextBlock { Text = "App Token", FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,5) },
-                       new TextBox { Name = "AppTokenInput", Width = 300, Margin = new Thickness(0,0,0,10) },
-                       new TextBlock { Text = "App URL", FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,5) },
-                       new TextBox { Name = "AppUrlInput", Width = 300, Margin = new Thickness(0,0,0,10) },
-                       new Button
-                       {
-                           Content = "Save",
-                           Style = FindResource("HeaderButtonStyle") as Style,
-                           Margin = new Thickness(0,10,0,0),
-                           HorizontalAlignment = HorizontalAlignment.Left
-                       }
-                   }
+                    Title = "Select CSV Data File",
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    FilterIndex = 1,
+                    RestoreDirectory = true
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    filePathLabel.Content = openFileDialog.FileName;
+                    filePathLabel.ToolTip = openFileDialog.FileName;
                 }
             };
 
-            var saveButton = (newTab.Content as StackPanel)?.Children.OfType<Button>().FirstOrDefault();
-            if (saveButton != null)
-            {
-                saveButton.Click += (s, args) =>
-                {
-                    var stackPanel = (newTab.Content as StackPanel);
-                    var nameInput = stackPanel.Children.OfType<TextBox>().FirstOrDefault(x => x.Name == "DataSourceNameInput");
-                    var tokenInput = stackPanel.Children.OfType<TextBox>().FirstOrDefault(x => x.Name == "AppTokenInput");
-                    var urlInput = stackPanel.Children.OfType<TextBox>().FirstOrDefault(x => x.Name == "AppUrlInput");
+            filePathPanel.Children.Add(filePathLabel);
+            filePathPanel.Children.Add(browseButton);
+            staticFieldsPanel.Children.Add(filePathPanel);
 
-                    if (string.IsNullOrWhiteSpace(nameInput.Text) || string.IsNullOrWhiteSpace(tokenInput.Text) || string.IsNullOrWhiteSpace(urlInput.Text))
+            mainStackPanel.Children.Add(staticFieldsPanel);
+
+            // Radio button event handlers to show/hide fields
+            realtimeRadio.Checked += (s, args) =>
+            {
+                realtimeFieldsPanel.Visibility = Visibility.Visible;
+                staticFieldsPanel.Visibility = Visibility.Collapsed;
+            };
+
+            staticRadio.Checked += (s, args) =>
+            {
+                realtimeFieldsPanel.Visibility = Visibility.Collapsed;
+                staticFieldsPanel.Visibility = Visibility.Visible;
+            };
+
+            // Save and Cancel buttons
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 20, 0, 0)
+            };
+
+            var saveButton = new Button
+            {
+                Content = "💾 Save Data Source",
+                Style = FindResource("HeaderButtonStyle") as Style,
+                Width = 150,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+
+            buttonPanel.Children.Add(saveButton);
+            mainStackPanel.Children.Add(buttonPanel);
+
+            var newTab = new TabItem
+            {
+                Header = $"➕ New Data Source",
+                Content = new ScrollViewer
+                {
+                    Content = mainStackPanel,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
+                }
+            };
+
+
+            // Save button click event
+            saveButton.Click += async (s, args) =>
+            {
+                try
+                {
+                    // Validate input
+                    if (string.IsNullOrWhiteSpace(nameInput.Text))
                     {
-                        MessageBox.Show("All fields are required.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Data source name is required.", "Validation Error",
+                                      MessageBoxButton.OK, MessageBoxImage.Warning);
+                        nameInput.Focus();
                         return;
                     }
 
-                    _dataSources.Add(new DataSource
-                    {
-                        Name = nameInput.Text,
-                        AppToken = tokenInput.Text,
-                        DataUrl = urlInput.Text,
-                        IsSelected = false
-                    });
+                    bool isRealtime = realtimeRadio.IsChecked == true;
+                    string dataUrl = "";
+                    string resourceUrl = "";
 
-                    DataSourceTabs.Items.Remove(newTab);
-                    DataSourceTabs.SelectedIndex = 0;
-                    MessageBox.Show("Data source added successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                };
-            }
+                    if (isRealtime)
+                    {
+                        // Validate real-time fields
+                        if (string.IsNullOrWhiteSpace(dataUrlInput.Text))
+                        {
+                            MessageBox.Show("Data URL is required for real-time data sources.", "Validation Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            dataUrlInput.Focus();
+                            return;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(resourceUrlInput.Text))
+                        {
+                            MessageBox.Show("Resource URL is required for real-time data sources.", "Validation Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            resourceUrlInput.Focus();
+                            return;
+                        }
+
+                        dataUrl = dataUrlInput.Text.Trim();
+                        resourceUrl = resourceUrlInput.Text.Trim();
+                    }
+                    else
+                    {
+                        // Validate static file field
+                        string filePath = filePathLabel.Content?.ToString();
+                        if (string.IsNullOrEmpty(filePath) || filePath == "No file selected")
+                        {
+                            MessageBox.Show("Please select a CSV file for static data sources.", "Validation Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        if (!File.Exists(filePath))
+                        {
+                            MessageBox.Show("The selected file does not exist.", "File Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+
+                        dataUrl = filePath;
+                        resourceUrl = "local";
+                    }
+
+                    // Check for duplicate names in memory collection
+                    if (_dataSources != null && _dataSources.Any(ds => ds.Name.Equals(nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var result = MessageBox.Show(
+                            $"A data source with the name '{nameInput.Text.Trim()}' already exists.\nDo you want to overwrite it?",
+                            "Duplicate Name",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (result != MessageBoxResult.Yes)
+                        {
+                            return;
+                        }
+                    }
+
+                    // Save to database
+                    bool success = AddDataSourceToDatabase(
+                        nameInput.Text.Trim(),
+                        dataUrl,
+                        resourceUrl,
+                        isRealtime);
+
+                    if (success)
+                    {
+                        // Refresh data sources
+                        RefreshDataSourcesList();
+
+                        // Close the tab
+                        DataSourceTabs.Items.Remove(newTab);
+                        DataSourceTabs.SelectedIndex = 0;
+
+                        // Show success message
+                        MessageBox.Show(
+                            $"Data source '{nameInput.Text.Trim()}' has been saved successfully!\n\n" +
+                            $"Type: {(isRealtime ? "Real-time" : "Static")}\n" +
+                            $"Data: {(isRealtime ? dataUrl : Path.GetFileName(dataUrl))}",
+                            "Success",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to save the data source. Please check the database connection.",
+                                      "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"An error occurred while saving the data source:\n\n{ex.Message}",
+                                  "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+
+
 
             DataSourceTabs.Items.Add(newTab);
             DataSourceTabs.SelectedItem = newTab;
@@ -233,7 +561,41 @@ namespace ForeSITETestApp
 
         private void DeleteDataSourceButton_Click(object sender, RoutedEventArgs e)
         {
+            
+            if (DataSourceTable.SelectedItem is DataSource selectedDataSource)
+            {
+                if (string.IsNullOrWhiteSpace(selectedDataSource.Name))
+                {
+                    MessageBox.Show("The selected data source does not have a valid name.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
 
+                var result = MessageBox.Show(
+                    $"Are you sure you want to delete the data source '{selectedDataSource.Name}'?",
+                    "Confirm Deletion",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Delete from database
+                    bool success = DBHelper.DeleteDataSourceByName(selectedDataSource.Name!);
+                    if (success)
+                    {
+                        // Refresh data sources list
+                        RefreshDataSourcesList();
+                        MessageBox.Show("Data source deleted successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to delete the data source. Please check the database connection.",
+                                      "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a data source to delete.", "Selection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void SchedulingButton_Click(object sender, RoutedEventArgs e)
@@ -241,7 +603,7 @@ namespace ForeSITETestApp
             MessageBox.Show("TODO: Scheduling function soon ^_^", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-      
+
 
         private void AddTitleButton_Click(object sender, RoutedEventArgs e)
         {
@@ -827,7 +1189,7 @@ namespace ForeSITETestApp
                     return; // Cancelled
                 }
 
-                
+
 
                 string plotTitle = dialog.PlotTitle;
 
@@ -893,14 +1255,14 @@ namespace ForeSITETestApp
                 else
                 {
                     string trainEndDate = TrainEndDatePicker.SelectedDate?.ToString("yyyy-MM-dd") ?? "";
-                    
-                    if (string.IsNullOrEmpty(trainEndDate) )
+
+                    if (string.IsNullOrEmpty(trainEndDate))
                     {
                         MessageBox.Show("Please select both Train End Date.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                     graphData["TrainEndDate"] = trainEndDate;
-                   
+
                 }
 
                 var requestData = new JObject
@@ -923,7 +1285,7 @@ namespace ForeSITETestApp
                         if (status?.ToLower() == "processed" && !string.IsNullOrEmpty(filePath))
                         {
                             // Validate file existence
-                            var file =  filePath;
+                            var file = filePath;
                             if (!File.Exists(file))
                             {
                                 MessageBox.Show($"Plot file not found at '{filePath}'.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -1047,7 +1409,7 @@ namespace ForeSITETestApp
 
                             MessageBox.Show($"Plot '{plotTitle}' added for model {model} from '{filePath}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                            
+
                         }
                         else
                         {
@@ -1082,9 +1444,9 @@ namespace ForeSITETestApp
 
         private void RedrawCanvas()
         {
-           
+
             DrawingCanvas.Children.Clear();
-            
+
 
             double topPosition = 0;
             double canvasWidth = Math.Max(DrawingCanvas.ActualWidth, 778); // Ensure canvas is wide enough
@@ -1132,9 +1494,18 @@ namespace ForeSITETestApp
             }
         }
 
-        private void AddCommentButton_Click(object sender, RoutedEventArgs e)
+        private void AddNotebookButton_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("TODO: Comment function soon^_^", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (_notebookWindow == null || !_notebookWindow.IsVisible)
+            {
+                _notebookWindow = new NotebookWindow(this.window);
+                _notebookWindow.Owner = window; // Optional: Sets the main window as owner
+                _notebookWindow.Show(); // Non-modal
+            }
+            else
+            {
+                _notebookWindow.Activate(); // Bring existing window to front
+            }
         }
     }
 }
