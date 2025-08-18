@@ -75,11 +75,11 @@ cd ForeSITE-Alerting-Report
      dotnet build
      ```
 
-### 3. Set Up the epySurv envrionment
+### 3. Set Up the epySurv environment (optional)
 
    - [epySurv](https://github.com/JarnoRFB/epysurv) for epySurv Setup
 
-### 4. Set Up the Flask Server
+### 4. Set Up the Flask Server (optional)
 
 1. **Install Dependencies**:
    - Install Flask :
@@ -94,6 +94,7 @@ cd ForeSITE-Alerting-Report
      ```
      Our Application doesn't need to call the Flask Server manually. it will be called by app into the background.
 
+**Step 3 and 4 are optional** User can download epySurv environment from Release 0.6
 
 ### 5. Run the Application
 - Run the WPF application as administrator to enable task scheduling:
