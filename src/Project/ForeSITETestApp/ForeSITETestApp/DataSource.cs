@@ -262,4 +262,14 @@ namespace ForeSITETestApp
 
 
 
+    /// <summary>
+    /// Result of Python code validation
+    /// </summary>
+    public class CodeValidationResult
+    {
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+    }
+
+
 }

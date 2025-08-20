@@ -804,6 +804,105 @@ namespace ForeSITETestApp
 
 
         /// <summary>
+        /// Validates Python code for basic syntax issues before sending to server
+        /// </summary>
+        /// <param name="code">Python code to validate</param>
+        /// <returns>Validation result</returns>
+        private CodeValidationResult ValidatePythonCode(string code)
+        {
+            var result = new CodeValidationResult { IsValid = true };
+
+            try
+            {
+                var lines = code.Split('\n');
+                var indentStack = new Stack<int>();
+                var blockStarters = new[] { "if", "elif", "else", "for", "while", "def", "class", "try", "except", "finally", "with" };
+
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var line = lines[i];
+                    var trimmedLine = line.TrimStart();
+
+                    // Skip empty lines and comments
+                    if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("#"))
+                        continue;
+
+                    // Calculate indentation
+                    var currentIndent = line.Length - line.TrimStart().Length;
+
+                    // Check for incomplete control structures
+                    if (trimmedLine.EndsWith(":"))
+                    {
+                        var keyword = trimmedLine.Split(' ')[0];
+                        if (blockStarters.Contains(keyword))
+                        {
+                            // This line starts a block, check if next non-empty line is properly indented
+                            bool foundIndentedContent = false;
+                            for (int j = i + 1; j < lines.Length; j++)
+                            {
+                                var nextLine = lines[j];
+                                var nextTrimmed = nextLine.TrimStart();
+
+                                if (string.IsNullOrWhiteSpace(nextTrimmed) || nextTrimmed.StartsWith("#"))
+                                    continue;
+
+                                var nextIndent = nextLine.Length - nextLine.TrimStart().Length;
+                                if (nextIndent > currentIndent)
+                                {
+                                    foundIndentedContent = true;
+                                    break;
+                                }
+                                else
+                                {
+                                    // Found content at same or less indentation - block is incomplete
+                                    break;
+                                }
+                            }
+
+                            if (!foundIndentedContent)
+                            {
+                                result.IsValid = false;
+                                result.ErrorMessage = $"Line {i + 1}: '{keyword}' statement missing indented block.\n" +
+                                                    $"Add content after the colon (:) or use 'pass' as a placeholder.";
+                                return result;
+                            }
+                        }
+                    }
+
+                    // Check for unmatched quotes (basic check)
+                    var singleQuotes = trimmedLine.Count(c => c == '\'');
+                    var doubleQuotes = trimmedLine.Count(c => c == '"');
+
+                    if (singleQuotes % 2 != 0 || doubleQuotes % 2 != 0)
+                    {
+                        result.IsValid = false;
+                        result.ErrorMessage = $"Line {i + 1}: Unmatched quotes detected.";
+                        return result;
+                    }
+
+                    // Check for unmatched parentheses/brackets (basic check)
+                    var parenCount = trimmedLine.Count(c => c == '(') - trimmedLine.Count(c => c == ')');
+                    var bracketCount = trimmedLine.Count(c => c == '[') - trimmedLine.Count(c => c == ']');
+                    var braceCount = trimmedLine.Count(c => c == '{') - trimmedLine.Count(c => c == '}');
+
+                    if (parenCount != 0 || bracketCount != 0 || braceCount != 0)
+                    {
+                        // Allow multi-line statements, but warn about potential issues
+                        // This is a simple check - more sophisticated parsing would be needed for full validation
+                    }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                result.IsValid = false;
+                result.ErrorMessage = $"Error validating code: {ex.Message}";
+                return result;
+            }
+        }
+
+        /// <summary>
         /// Executes Python code on the server and displays results in the output area
         /// </summary>
         /// <param name="code">Python code to execute</param>
@@ -821,6 +920,17 @@ namespace ForeSITETestApp
             if (outputArea == null)
             {
                 throw new ArgumentNullException(nameof(outputArea));
+            }
+
+            // Validate Python code syntax before sending
+            var validationResult = ValidatePythonCode(code);
+            if (!validationResult.IsValid)
+            {
+                SetOutputDisplay(outputArea,
+                    $"❌ Python Syntax Error:\n{validationResult.ErrorMessage}\n\n" +
+                    $"Please fix the syntax before executing.",
+                    OutputType.Error);
+                return;
             }
 
             // Show initial loading state

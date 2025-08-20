@@ -115,7 +115,7 @@
                         <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="Data Sources Supported" FontSize="16" FontWeight="SemiBold"/>
-                                <TextBlock Text="4" FontSize="24" FontWeight="Bold" Margin="0,5,0,0"/>
+                                <TextBlock x:Name="DataSourceCountTextBlock" Text="{Binding DataSourceCount}" FontSize="24" FontWeight="Bold" Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>
                         <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">

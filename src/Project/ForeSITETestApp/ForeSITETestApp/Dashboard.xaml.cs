@@ -7,12 +7,14 @@
 
 
 using Microsoft.Data.Sqlite;
+using Microsoft.VisualBasic;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -48,22 +50,52 @@ namespace ForeSITETestApp
             _httpClient = window.getHttpClient();
             _reportElements = new List<ReportElement>(); // Initialize report elements list
             InitializeDataSources();
+            
             // Initialize default FlowDocument
             _titleDocument = new FlowDocument(new Paragraph(new Run("Click to edit title")));
             // Set custom font resolver
             GlobalFontSettings.FontResolver = new CustomFontResolver();
             DrawingCanvas.Height = 300; // Minimum height for placeholder
             CheckAndManagePlaceholder();
+
+            DataContext = this;
+        }
+
+        // INotifyPropertyChanged implementation
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
 
+
+        public int DataSourceCount
+        {
+            get { return _dataSources?.Count ?? 0; }
+        }
 
         private void InitializeDataSources()
         {
             // Load data sources from the database
             _dataSources = DBHelper.GetAllDataSources();
+
+            // Subscribe to collection changed events
+            if (_dataSources != null)
+            {
+                _dataSources.CollectionChanged += (sender, e) =>
+                {
+                    // Manually update the TextBlock when collection changes
+                    UpdateDataSourceCountDisplay();
+                };
+            }
+
             DataSourceTable.ItemsSource = _dataSources;
             DataSourceSelector.ItemsSource = _dataSources; // Bind to DataSourceSelector
+
+            // Initialize the display
+            UpdateDataSourceCountDisplay();
         }
 
 
@@ -76,6 +108,29 @@ namespace ForeSITETestApp
             DataSourceGrid.Visibility = Visibility.Collapsed;
         }
 
+        // Helper method to refresh just the data source count
+        private void RefreshDataSourceCount()
+        {
+            try
+            {
+                // Get updated count from database
+                var latestDataSources = DBHelper.GetAllDataSources();
+
+                // Update the collection if the count has changed
+                if (_dataSources != null && _dataSources.Count != latestDataSources.Count)
+                {
+                    RefreshDataSourcesList();
+                }
+
+                // Manually update the TextBlock display
+                UpdateDataSourceCountDisplay();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error refreshing data source count: {ex.Message}");
+            }
+        }
+
         private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
             HeaderTitle.Text = "Home";
@@ -84,6 +139,23 @@ namespace ForeSITETestApp
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
 
+            RefreshDataSourceCount();
+        }
+
+        private void UpdateDataSourceCountDisplay()
+        {
+            try
+            {
+                // Update the TextBlock directly
+                if (DataSourceCountTextBlock != null)
+                {
+                    DataSourceCountTextBlock.Text = (_dataSources?.Count ?? 0).ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating data source count display: {ex.Message}");
+            }
         }
 
         private void ReportButton_Click(object sender, RoutedEventArgs e)
@@ -205,6 +277,8 @@ namespace ForeSITETestApp
                         });
                     }
                 }
+                // Manually update the TextBlock
+                UpdateDataSourceCountDisplay();
 
                 // Refresh the data source toolbar if it exists
                 if (_notebookWindow != null)

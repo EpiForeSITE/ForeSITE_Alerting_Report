@@ -103,6 +103,166 @@ class SafeStringIO(io.StringIO):
     def get_output(self):
         return ''.join(self.outputs)
 
+def split_code_into_blocks(code):
+    """
+    Split code into logical blocks that respect Python's indentation structure.
+    This ensures multi-line constructs like if/for/while blocks stay together.
+    """
+    lines = code.split('\n')
+    blocks = []
+    current_block = []
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        
+        # Skip empty lines
+        if not stripped:
+            if current_block:
+                current_block.append(line)
+            i += 1
+            continue
+            
+        # Skip comments but preserve them
+        if stripped.startswith('#'):
+            if current_block:
+                current_block.append(line)
+            else:
+                blocks.append(line)
+            i += 1
+            continue
+        
+        # Calculate indentation
+        indent = len(line) - len(line.lstrip())
+        
+        # Check if this line starts a block (ends with colon)
+        if stripped.endswith(':'):
+            # This line starts a new block, collect it and its indented content
+            current_block = [line]
+            base_indent = indent
+            i += 1
+            
+            # Collect all lines that belong to this block
+            while i < len(lines):
+                next_line = lines[i]
+                next_stripped = next_line.strip()
+                
+                # Skip empty lines and comments within the block
+                if not next_stripped or next_stripped.startswith('#'):
+                    current_block.append(next_line)
+                    i += 1
+                    continue
+                
+                next_indent = len(next_line) - len(next_line.lstrip())
+                
+                # If this line is indented more than the base, it belongs to the block
+                if next_indent > base_indent:
+                    current_block.append(next_line)
+                    i += 1
+                elif next_indent == base_indent and next_stripped.startswith(('elif', 'else', 'except', 'finally')):
+                    # Special case for elif, else, except, finally
+                    current_block.append(next_line)
+                    i += 1
+                else:
+                    # This line is at the same or lesser indentation, end the block
+                    break
+            
+            # Add the completed block
+            blocks.append('\n'.join(current_block))
+            current_block = []
+        else:
+            # Single line statement
+            if current_block:
+                blocks.append('\n'.join(current_block))
+                current_block = []
+            blocks.append(line)
+            i += 1
+    
+    # Add any remaining block
+    if current_block:
+        blocks.append('\n'.join(current_block))
+    
+    return blocks
+
+def incomplete_statement(line):
+    """
+    Check if a line appears to be an incomplete statement that continues on the next line.
+    """
+    line = line.strip()
+    if not line:
+        return False
+    
+    # Check for unmatched parentheses, brackets, or braces
+    parens = line.count('(') - line.count(')')
+    brackets = line.count('[') - line.count(']')
+    braces = line.count('{') - line.count('}')
+    
+    return parens > 0 or brackets > 0 or braces > 0
+
+def is_single_expression(code_block):
+    """
+    Check if a code block is a single expression that can be evaluated.
+    """
+    try:
+        # Remove leading/trailing whitespace and split into lines
+        lines = [line.strip() for line in code_block.strip().split('\n') if line.strip()]
+        
+        # Multi-line blocks are not single expressions
+        if len(lines) > 1:
+            return False
+
+        if not lines:
+            return False
+        
+        line = lines[0]
+        
+        # Check if it's a statement keyword
+        statement_keywords = [
+            'if', 'elif', 'else', 'for', 'while', 'def', 'class', 
+            'try', 'except', 'finally', 'with', 'import', 'from',
+            'return', 'yield', 'raise', 'assert', 'del', 'pass',
+            'break', 'continue', 'global', 'nonlocal'
+        ]
+        
+        first_word = line.split()[0] if line.split() else ''
+        if first_word in statement_keywords:
+            return False
+        
+        # Check if it ends with colon (usually indicates a statement)
+        if line.endswith(':'):
+            return False
+        
+        # Check if it contains assignment (but not comparison operators)
+        if '=' in line:
+            # More sophisticated assignment detection
+            # Skip if it's a comparison operator
+            assignment_ops = ['=', '+=', '-=', '*=', '/=', '%=', '**=', '//=', '&=', '|=', '^=', '<<=', '>>=']
+            comparison_ops = ['==', '!=', '<=', '>=', '<', '>']
+            
+            # Check if any assignment operator is present (but not comparison)
+            has_assignment = False
+            for op in assignment_ops:
+                if op in line:
+                    # Make sure it's not part of a comparison operator
+                    if op == '=' and ('==' in line or '!=' in line or '<=' in line or '>=' in line):
+                        continue
+                    has_assignment = True
+                    break
+            
+            if has_assignment:
+                return False
+        
+        # Try to compile as expression
+        try:
+            compile(line, '<string>', 'eval')
+            return True
+        except SyntaxError:
+            return False
+            
+    except:
+        return False
+
 def execute_python_code(code, timeout=30):
     """
     Execute Python code safely and return the result.
@@ -130,41 +290,60 @@ def execute_python_code(code, timeout=30):
             'result': ''
         }
         
+        # Initialize variables that might be referenced in finally block
+        last_expr_result = None
+        local_namespace = {}
+
         try:
             # Redirect stdout and stderr
             sys.stdout = stdout_capture
             sys.stderr = stderr_capture
+
+            # Clean and validate the code
+            code = code.strip()
+            if not code:
+                result['output'] = "No code to execute"
+                return result
             
-            # Split code into statements
-            statements = [stmt.strip() for stmt in code.split('\n') if stmt.strip()]
+            # First, try to validate the syntax
+            try:
+                compile(code, '<string>', 'exec')
+            except SyntaxError as e:
+                result['success'] = False
+                result['error'] = f"Syntax Error: {str(e)}"
+                return result
+
             
-            # Execute code
-            last_expr_result = None
-            local_namespace = {}
             
-            for i, statement in enumerate(statements):
-                if not statement or statement.startswith('#'):
+            # Split code into logical blocks (respecting indentation)
+            code_blocks = split_code_into_blocks(code)
+
+
+            for i, block in enumerate(code_blocks):
+                if not block.strip() or block.strip().startswith('#'):
                     continue
                     
                 try:
-                    # Try to compile as expression first (for last statement)
-                    if i == len(statements) - 1:
+                    # For the last block, try to evaluate as expression first
+                    if i == len(code_blocks) - 1 and is_single_expression(block):
                         try:
-                            compiled_expr = compile(statement, '<string>', 'eval')
+                            compiled_expr = compile(block, '<string>', 'eval')
                             last_expr_result = eval(compiled_expr, GLOBAL_NAMESPACE, local_namespace)
                             if last_expr_result is not None:
                                 print(repr(last_expr_result))
                         except SyntaxError:
                             # If it's not an expression, execute as statement
-                            compiled_stmt = compile(statement, '<string>', 'exec')
+                            compiled_stmt = compile(block, '<string>', 'exec')
                             exec(compiled_stmt, GLOBAL_NAMESPACE, local_namespace)
                     else:
-                        compiled_stmt = compile(statement, '<string>', 'exec')
+                        # Execute as statement
+                        compiled_stmt = compile(block, '<string>', 'exec')
                         exec(compiled_stmt, GLOBAL_NAMESPACE, local_namespace)
                         
                 except Exception as e:
-                    error_msg = f"Error in statement '{statement}': {str(e)}"
+                    error_msg = f"Error in code block: {str(e)}\nBlock content:\n{block}"
                     print(error_msg, file=sys.stderr)
+                    print(traceback.format_exc(), file=sys.stderr)
                     result['success'] = False
                     break
             
@@ -186,7 +365,7 @@ def execute_python_code(code, timeout=30):
             result['error'] = stderr_capture.get_output()
             
             if last_expr_result is not None and result['success']:
-                result['result'] = str(last_expr_result)
+                result['result'] = format_result_for_display(last_expr_result)
             
         return result
         
@@ -197,6 +376,87 @@ def execute_python_code(code, timeout=30):
             'error': f"System error: {str(e)}",
             'result': ''
         }
+
+def display_result(obj):
+    """
+    Enhanced display function for different Python objects.
+    """
+    if isinstance(obj, pd.DataFrame):
+        print("DataFrame Info:")
+        print(f"Shape: {obj.shape}")
+        print(f"Columns: {list(obj.columns)}")
+        print("\nData:")
+        # Use pandas' to_string() for better formatting
+        if len(obj) > 0:
+            # Show first few rows with proper formatting
+            display_df = obj.head(10)  # Show up to 10 rows
+            print(display_df.to_string())
+        else:
+            print("DataFrame is empty")
+            
+        # Show index info if it's a DatetimeIndex
+        if isinstance(obj.index, pd.DatetimeIndex):
+            print(f"\nIndex: DatetimeIndex")
+            print(f"Date range: {obj.index.min()} to {obj.index.max()}")
+            
+    elif isinstance(obj, pd.Series):
+        print("Series Info:")
+        print(f"Length: {len(obj)}")
+        print(f"Name: {obj.name}")
+        print("\nData:")
+        if len(obj) > 0:
+            # Show first few values
+            display_series = obj.head(10)
+            print(display_series.to_string())
+        else:
+            print("Series is empty")
+            
+    elif isinstance(obj, (list, tuple)) and len(obj) > 0:
+        print(f"{type(obj).__name__} with {len(obj)} items:")
+        # Show first few items
+        for i, item in enumerate(obj[:10]):
+            print(f"  [{i}]: {repr(item)}")
+        if len(obj) > 10:
+            print(f"  ... and {len(obj) - 10} more items")
+            
+    elif isinstance(obj, dict):
+        print(f"Dictionary with {len(obj)} keys:")
+        for i, (key, value) in enumerate(obj.items()):
+            if i >= 10:  # Limit display
+                print(f"  ... and {len(obj) - 10} more items")
+                break
+            print(f"  {repr(key)}: {repr(value)}")
+            
+    elif hasattr(obj, '__array__'):  # NumPy arrays
+        print(f"Array Info:")
+        print(f"Shape: {obj.shape}")
+        print(f"Dtype: {obj.dtype}")
+        print("Data:")
+        print(obj)
+        
+    else:
+        # Default representation
+        print(repr(obj))
+
+def format_result_for_display(obj):
+    """
+    Format the result object for the result field in JSON response.
+    """
+    if isinstance(obj, pd.DataFrame):
+        if len(obj) > 0:
+            return f"DataFrame({obj.shape[0]} rows × {obj.shape[1]} columns)"
+        else:
+            return "Empty DataFrame"
+    elif isinstance(obj, pd.Series):
+        return f"Series(length={len(obj)}, name='{obj.name}')"
+    elif isinstance(obj, (list, tuple)):
+        return f"{type(obj).__name__}(length={len(obj)})"
+    elif isinstance(obj, dict):
+        return f"dict(keys={len(obj)})"
+    elif hasattr(obj, '__array__'):
+        return f"Array(shape={obj.shape}, dtype={obj.dtype})"
+    else:
+        return str(obj)
 
 def get_data_source_by_name_from_db(name):
     """
@@ -291,12 +551,12 @@ def getCdcData(resourceUri):
         return None
 
 def get_resource_uri(datasource):
-    if datasource in ["Covid-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
+    if datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
         return "r8kw-7aab"
     else:
         return "local"
 
-def generate_cdc_data(datasource="Covid-19 Deaths", threshold=4000,):
+def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
     """
     Author: Jasmine He
 
@@ -320,7 +580,7 @@ def generate_cdc_data(datasource="Covid-19 Deaths", threshold=4000,):
          if cdcdf is not None:
              df_week=cdcdf[cdcdf['mmwr_week']>='1']
              df_week_us=df_week[df_week['state']=='United States']
-             if datasource == "Covid-19 Deaths":
+             if datasource == "COVID-19 Deaths":
                    cdcdf=df_week_us[['start_date', 'end_date', 'mmwr_week',  'covid_19_deaths' ]]
                    cdcdf = cdcdf.rename(columns={"covid_19_deaths": "n_cases"})
              elif datasource == "Pneumonia Deaths":   
@@ -701,7 +961,7 @@ def process_json():
     try:
         # 7. 根据数据源处理数据
         print(datasource)
-        if datasource == "Covid-19 Tests":
+        if datasource == "COVID-19 Tests":
             print("Using local data source for COVID-19 test data.")
             print("Current working directory:", os.getcwd())
             df2020 = pd.read_csv("local_covid_19_test_data.csv")
@@ -716,8 +976,9 @@ def process_json():
                 years_back=yearback,
                 plot_title=title
             )
-        elif datasource in ["Covid-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
-                # 7. 获取数据
+        elif datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
+        # 7. 获取数据
+            print(datasource)
             try:
                cdc_data = generate_cdc_data(datasource, threshold=threshold)
                # Create a complete date range (daily frequency)
@@ -1115,13 +1376,13 @@ def add_variable():
         print(f"Creating data source variable: {variable_name} from {datasource}")
 
         # Generate data based on datasource
-        if datasource == "Covid-19 Tests":
+        if datasource == "COVID-19 Tests":
             print("Using local data source for COVID-19 test data.")
             print("Current working directory:", os.getcwd())
             df = pd.read_csv("local_covid_19_test_data.csv")
             df['date'] = pd.to_datetime(df['date'])  # Ensure 'date' is datetime type
             df = df.set_index('date')
-        elif datasource in ["Covid-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
+        elif datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
             # Create a complete date range (daily frequency)
             # Use CDC data
             df = generate_cdc_data(datasource, threshold=threshold)
