@@ -15,9 +15,14 @@
 - **Rich Text Editing**: Customize report titles with rich text formatting (bold, italic, etc.).
 - **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
-- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with Python code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
+- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with Python code cells and R code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
+- **Enable Seamless Data Exchnage**: Our objective is to facilitate the seamless interchange of datasets between R and Python 
 
 ## Changelog
+
+### Version 0.7 (August 25, 2025)
+- Added R support in Jupyter-like notebook to enable seamless data exchnage between R and Python
+- Updated log system to better understanding for user
 
 ### Version 0.6 (August 18, 2025)
 - Added a Jupyter-like notebook for advanced users to perform data analysis at runtime.
