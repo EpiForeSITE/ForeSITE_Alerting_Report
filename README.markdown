@@ -222,7 +222,7 @@ ForeSITE-Alerting-Report/
 
 ## Animation Demo
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
-- Select CDC data as a data source in the "Add Plot" dialog.
+- Select CDC data as a data source in the "Add Plot" dialog. 
 ![Alerting_2](images/Alerting_2.gif)
 
 ### Advanced Data Analysis with Notebook
@@ -234,9 +234,10 @@ Advanced users can leverage the "Data Analysis" feature to open a Jupyter-like N
 - **Real-Time Analysis**: Perform data analysis on CDC public surveillance data or imported custom datasets, enhancing exploratory data analysis capabilities.
 
 This feature is designed for users with Python expertise, providing a flexible environment to experiment with data processing and visualization alongside the application's core reporting functionality.
+(version 0.6)
 ![Alerting_3](images/Alerting_3.gif)
 
-R Language cell support
+R Language cell support (version 0.7)
 ![Alerting_5](images/Alerting_5.gif)
 
 ### Import customized data set
@@ -245,11 +246,11 @@ R Language cell support
 
 
 ## Screenshots
-
+(version 0.7)
 ![Screenshot 2025-08-25](images/Screenshot2025-08-25-100422.png)
-
+(version 0.5)
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-01.png)
-
+(version 0.5)
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-02.png)
 
 
