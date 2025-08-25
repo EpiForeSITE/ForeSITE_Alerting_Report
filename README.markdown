@@ -22,7 +22,7 @@
 
 ### Version 0.7 (August 25, 2025)
 - Added R support in Jupyter-like notebook to enable seamless data exchnage between R and Python
-- Updated log system to better understanding for user
+- Updated log system for users to better understand the output
 
 ### Version 0.6 (August 18, 2025)
 - Added a Jupyter-like notebook for advanced users to perform data analysis at runtime.
