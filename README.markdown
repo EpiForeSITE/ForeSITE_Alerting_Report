@@ -3,7 +3,7 @@
 <img src="images/foreSITEAlertingReport_icon2.jpg" alt="ForeSITE Alerting Report Logo" width="200"/>
 
 
-**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
+**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
 
 ## Features
 
@@ -15,7 +15,7 @@
 - **Rich Text Editing**: Customize report titles with rich text formatting (bold, italic, etc.).
 - **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
-- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with Python code cells and R code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
+- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with **Python** code cells and **R** code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
 - **Enable Seamless Data Exchnage**: Our objective is to facilitate the seamless interchange of datasets between R and Python 
 
 ## Changelog
@@ -228,12 +228,16 @@ The application uses **CDC public surveillance data** for demonstration purposes
 ### Advanced Data Analysis with Notebook
 Advanced users can leverage the "Data Analysis" feature to open a Jupyter-like Notebook window for runtime data analysis. This non-modal window allows users to:
 - **Input Python Code**: Utilize a code editor with Python syntax highlighting to write and edit Python scripts.
-- **Dynamic Cell Management**: Add new code cells with the "+ Code" button, delete cells with the "Delete" button, and execute code using the "Run" button (currently a placeholder, with plans for integration with the Python environment).
+- **Input R Code**: Utilize a code editor with R code to write and edit R scripts.
+- **Dynamic Cell Management**: Add new Python/R code cells with the "Python" or "R" button, delete cells with the "Delete" button, and execute code using the "Run" button (currently a placeholder, with plans for integration with the Python environment).
 - **Save and Load**: Persist notebook content to `Documents\notebook.json` using the "Save" button and reload it with the "Load" button, enabling session continuity.
 - **Real-Time Analysis**: Perform data analysis on CDC public surveillance data or imported custom datasets, enhancing exploratory data analysis capabilities.
 
 This feature is designed for users with Python expertise, providing a flexible environment to experiment with data processing and visualization alongside the application's core reporting functionality.
 ![Alerting_3](images/Alerting_3.gif)
+
+R Language cell support
+![Alerting_5](images/Alerting_5.gif)
 
 ### Import customized data set
 - **Customized Data**: One column with name "date" or "dates" or "start_date", and another column with name "cases" or "n_cases" or "count" or "deaths" or "case_count"
@@ -241,9 +245,14 @@ This feature is designed for users with Python expertise, providing a flexible e
 
 
 ## Screenshots
+
+![Screenshot 2025-08-25](images/Screenshot2025-08-25-100422.png)
+
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-01.png)
 
 ![Screenshot 2025-07-01](images/Screenshot-2025-7-1-02.png)
+
+
 
 ## Troubleshooting
 
