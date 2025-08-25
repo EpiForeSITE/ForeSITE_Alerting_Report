@@ -23,11 +23,13 @@ namespace ForeSITETestApp
         private StackPanel _cellContainer;
         private string _savePath;
         internal NotebookClient _notebookClient; // Made internal so NamespaceWindow can access it
+        private bool _rAvailable = false;
 
         private ComboBox _dataSourceComboBox;
         private TextBox _variableNameTextBox;
         private TextBox _thresholdTextBox;
         private Button _addVariableButton;
+        private Button _addRButton;
         private DataSourcesResult _dataSourcesResult = new DataSourcesResult();
 
 
@@ -39,6 +41,7 @@ namespace ForeSITETestApp
             LoadDataSources();
             // Check server connection on startup
             _ = CheckServerConnection();
+
         }
 
         /// <summary>
@@ -51,6 +54,18 @@ namespace ForeSITETestApp
             try
             {
                 _dataSourceComboBox.Items.Clear();
+
+                if (_dataSourcesResult?.DataSources == null || !_dataSourcesResult.DataSources.Any())
+                {
+                    var emptyItem = new ComboBoxItem
+                    {
+                        Content = "No data sources available",
+                        IsEnabled = false
+                    };
+                    _dataSourceComboBox.Items.Add(emptyItem);
+                    _addVariableButton.IsEnabled = false;
+                    return;
+                }
 
                 foreach (var dataSource in _dataSourcesResult.DataSources.OrderBy(ds => ds.Name))
                 {
@@ -66,10 +81,18 @@ namespace ForeSITETestApp
                 if (_dataSourceComboBox.Items.Count > 0)
                 {
                     _dataSourceComboBox.SelectedIndex = 0;
+                    _addVariableButton.IsEnabled = true;
                 }
 
-                // Update default threshold
-                _thresholdTextBox.Text = _dataSourcesResult.DefaultThreshold.ToString();
+                // Update default threshold with validation
+                if (_dataSourcesResult.DefaultThreshold > 0)
+                {
+                    _thresholdTextBox.Text = _dataSourcesResult.DefaultThreshold.ToString();
+                }
+                else
+                {
+                    _thresholdTextBox.Text = "1500"; // Fallback default
+                }
             }
             catch (Exception ex)
             {
@@ -113,7 +136,7 @@ namespace ForeSITETestApp
             mainPanel.Children.Add(scrollViewer);
 
             Content = mainPanel;
-            AddInitialCells();
+            //AddInitialCells();
         }
 
         private StackPanel CreateDataSourceToolbar()
@@ -307,7 +330,7 @@ namespace ForeSITETestApp
                 _addVariableButton.Content = "⏳ Adding...";
 
                 var selectedItem = (ComboBoxItem)_dataSourceComboBox.SelectedItem;
-                var dataSource = ((DataSource)selectedItem.Tag).Name;
+                var dataSource = ((DataSource)selectedItem.Tag)?.Name;
 
                 // Add variable to namespace
                 var result = await _notebookClient.AddVariableAsync(dataSource, variableName, threshold);
@@ -382,7 +405,9 @@ namespace ForeSITETestApp
 
             var saveButton = CreateButton("💾 Save", SaveNotebook_Click);
             var loadButton = CreateButton("📁 Load", LoadNotebook_Click);
-            var addCodeButton = CreateButton("➕ Code", (s, e) => AddCodeCell());
+            var addPythonButton = CreateButton("🐍 Python", (s, e) => AddCodeCell(CellLanguage.Python));
+            // Add R button if R is available
+            _addRButton =  CreateButton("📊 R", (s, e) => AddCodeCell(CellLanguage.R));
             var addMarkdownButton = CreateButton("📝 Markdown", (s, e) => AddMarkdownCell());
             var runAllButton = CreateButton("▶️ Run All", RunAllCells_Click);
             var clearOutputButton = CreateButton("🗑️ Clear Output", 140, ClearAllOutput_Click);
@@ -392,7 +417,8 @@ namespace ForeSITETestApp
             toolbar.Children.Add(saveButton);
             toolbar.Children.Add(loadButton);
             toolbar.Children.Add(new Separator { Width = 10 });
-            toolbar.Children.Add(addCodeButton);
+            toolbar.Children.Add(addPythonButton);
+            toolbar.Children.Add(_addRButton);
             toolbar.Children.Add(addMarkdownButton);
             toolbar.Children.Add(new Separator { Width = 10 });
             toolbar.Children.Add(runAllButton);
@@ -428,7 +454,50 @@ namespace ForeSITETestApp
             AddCodeCell();
         }
 
-        private void AddCodeCell()
+        private string GetLanguageDisplayName(CellLanguage language)
+        {
+            return language switch
+            {
+                CellLanguage.Python => "Python",
+                CellLanguage.R => "R",
+                CellLanguage.Markdown => "Markdown",
+                _ => "Code"
+            };
+        }
+
+        private Brush GetLanguageColor(CellLanguage language)
+        {
+            return language switch
+            {
+                CellLanguage.Python => Brushes.LightBlue,
+                CellLanguage.R => Brushes.LightGreen,
+                CellLanguage.Markdown => Brushes.LightCoral,
+                _ => Brushes.LightGray
+            };
+        }
+
+        private IHighlightingDefinition GetSyntaxHighlighting(CellLanguage language)
+        {
+            return language switch
+            {
+                CellLanguage.Python => HighlightingManager.Instance.GetDefinition("Python"),
+                CellLanguage.R => HighlightingManager.Instance.GetDefinition("R"),
+                CellLanguage.Markdown => HighlightingManager.Instance.GetDefinition("MarkDown"),
+                _ => HighlightingManager.Instance.GetDefinition("Python")
+            };
+        }
+
+        private string GetDefaultCode(CellLanguage language)
+        {
+            return language switch
+            {
+                CellLanguage.Python => "# Enter Python code here\nprint('Hello from Python!')",
+                CellLanguage.R => "# Enter R code here\nprint('Hello from R!')",
+                _ => "# Enter code here\nprint('Hello World!')"
+            };
+        }
+
+        private void AddCodeCell(CellLanguage language = CellLanguage.Python)
         {
             var cellPanel = CreateCellPanel();
             var cellContent = new StackPanel();
@@ -436,21 +505,22 @@ namespace ForeSITETestApp
             // Cell type indicator
             var cellTypeLabel = new Label
             {
-                Content = "Code",
-                Background = Brushes.LightBlue,
+                Content = GetLanguageDisplayName(language),
+                Background = GetLanguageColor(language),
                 FontWeight = FontWeights.Bold,
                 Padding = new Thickness(5, 2, 5, 2)
             };
 
-            // Code editor
+            // Code editor with appropriate syntax highlighting
             var textEditor = new TextEditor
             {
-                SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("Python"),
+                SyntaxHighlighting = GetSyntaxHighlighting(language),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 MinHeight = 120,
-                Text = "# Enter Python code here\nprint('Hello, Notebook!')",
+                Text = GetDefaultCode(language),
                 FontSize = 12,
-                ShowLineNumbers = true
+                ShowLineNumbers = true,
+                Tag = language // Store language in Tag property
             };
 
             // Output area
@@ -470,7 +540,7 @@ namespace ForeSITETestApp
             };
 
             // Button panel
-            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, CellType.Code);
+            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, language);
 
             cellContent.Children.Add(cellTypeLabel);
             cellContent.Children.Add(textEditor);
@@ -481,7 +551,7 @@ namespace ForeSITETestApp
             _cellContainer.Children.Add(cellPanel);
         }
 
-        private void AddMarkdownCell()
+        private void AddMarkdownCell(CellLanguage language = CellLanguage.Markdown)
         {
             var cellPanel = CreateCellPanel();
             var cellContent = new StackPanel();
@@ -520,7 +590,7 @@ namespace ForeSITETestApp
             };
 
             // Button panel
-            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, CellType.Markdown);
+            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, language);
 
             cellContent.Children.Add(cellTypeLabel);
             cellContent.Children.Add(textEditor);
@@ -530,7 +600,7 @@ namespace ForeSITETestApp
             cellPanel.Child = cellContent;
             _cellContainer.Children.Add(cellPanel);
         }
-
+      
         private Border CreateCellPanel()
         {
             return new Border
@@ -539,11 +609,12 @@ namespace ForeSITETestApp
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 5, 0, 5),
                 Padding = new Thickness(10),
-                CornerRadius = new CornerRadius(5)
+                CornerRadius = new CornerRadius(5),
+                Background = Brushes.White
             };
         }
 
-        private StackPanel CreateCellButtonPanel(TextEditor editor, TextBox outputArea, Border cellPanel, CellType cellType)
+        private StackPanel CreateCellButtonPanel(TextEditor editor, TextBox outputArea, Border cellPanel, CellLanguage language)
         {
             var buttonPanel = new StackPanel
             {
@@ -554,23 +625,33 @@ namespace ForeSITETestApp
 
             var runButton = new Button
             {
-                Content = cellType == CellType.Code ? "▶️ Run" : "📝 Render",
+                Content = language == CellLanguage.Markdown ? "📝 Render" : "▶️ Run",
                 Width = 100,
-                Margin = new Thickness(5, 0, 0, 0)
+                Margin = new Thickness(5, 0, 0, 0),
+                Background = Brushes.LightGreen
             };
-            runButton.Click += async (s, e) => await RunCell(editor, outputArea, cellType);
+            runButton.Click += async (s, e) => await RunCell(editor, outputArea, language);
 
-            var addCodeButton = new Button
+            var addPythonButton = new Button
             {
-                Content = "➕ Code",
+                Content = "🐍 Python",
                 Width = 100,
                 Margin = new Thickness(5, 0, 0, 0)
             };
-            addCodeButton.Click += (s, e) => AddCodeCell();
+            addPythonButton.Click += (s, e) => AddCodeCell(CellLanguage.Python);
+
+            var addRButton = new Button
+            {
+                Content = "📊 R",
+                Width = 100,
+                Margin = new Thickness(5, 0, 0, 0),
+                //IsEnabled = _rAvailable
+            };
+            addRButton.Click += (s, e) => AddCodeCell(CellLanguage.R);
 
             var addMarkdownButton = new Button
             {
-                Content = "➕ MD",
+                Content = "📝 MD",
                 Width = 100,
                 Margin = new Thickness(5, 0, 0, 0)
             };
@@ -586,7 +667,10 @@ namespace ForeSITETestApp
             deleteButton.Click += (s, e) => _cellContainer.Children.Remove(cellPanel);
 
             buttonPanel.Children.Add(runButton);
-            buttonPanel.Children.Add(addCodeButton);
+            buttonPanel.Children.Add(addPythonButton);
+            
+            buttonPanel.Children.Add(addRButton);
+            
             buttonPanel.Children.Add(addMarkdownButton);
             buttonPanel.Children.Add(deleteButton);
 
@@ -598,6 +682,7 @@ namespace ForeSITETestApp
         /// </summary>
         private void UpdateOutputDisplay(TextBox outputArea, string message, OutputType type)
         {
+            if (outputArea == null) return;
             outputArea.Visibility = Visibility.Visible;
             outputArea.Text = message;
 
@@ -662,13 +747,14 @@ namespace ForeSITETestApp
             }
         }
 
+
         /// <summary>
         /// Enhanced version of RunCell that works with the new RunPythonCode implementation
         /// </summary>
         /// <param name="editor">Text editor containing the code</param>
         /// <param name="outputArea">Output display area</param>
         /// <param name="cellType">Type of cell (Code or Markdown)</param>
-        private async Task RunCell(TextEditor editor, TextBox outputArea, CellType cellType)
+        private async Task RunCell(TextEditor editor, TextBox outputArea, CellLanguage language)
         {
             if (editor == null || outputArea == null)
             {
@@ -684,13 +770,18 @@ namespace ForeSITETestApp
                 // Disable the editor during execution to prevent changes
                 editor.IsReadOnly = true;
 
-                if (cellType == CellType.Code)
+                if (language == CellLanguage.Markdown)
+                {
+                    // Handle markdown rendering
+                    await RenderMarkdown(editor.Text, outputArea);
+                }
+                else
                 {
                     // Validate that we have code to execute
                     var code = editor.Text?.Trim();
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        SetOutputDisplay(outputArea, "No code to execute. Please enter some Python code.", OutputType.Warning);
+                        SetOutputDisplay(outputArea, "No code to execute. Please enter some code.", OutputType.Warning);
                         return;
                     }
 
@@ -701,28 +792,34 @@ namespace ForeSITETestApp
                     if (!isServerRunning)
                     {
                         SetOutputDisplay(outputArea,
-                            "❌ Cannot connect to Python server.\n\n" +
-                            "Please ensure the Python server is running:\n" +
+                            "❌ Cannot connect to Python/R server.\n\n" +
+                            "Please ensure the enhanced server is running:\n" +
                             "1. Open terminal/command prompt\n" +
                             "2. Navigate to your Python script directory\n" +
-                            "3. Run: python epyflaServer_enhanced.py\n" +
+                            "3. Run: python epyflaServer.py\n" +
                             "4. Wait for 'Running on http://127.0.0.1:5001' message\n\n" +
                             "Then try executing the cell again.",
                             OutputType.Error);
                         return;
                     }
 
-                    // Execute the Python code
-                    await RunPythonCode(code, outputArea);
-                }
-                else if (cellType == CellType.Markdown)
-                {
-                    // Handle markdown rendering
-                    await RenderMarkdown(editor.Text, outputArea);
-                }
-                else
-                {
-                    SetOutputDisplay(outputArea, $"Unknown cell type: {cellType}", OutputType.Error);
+                    // Check R availability for R cells
+                    if (language == CellLanguage.R && !_rAvailable)
+                    {
+                        SetOutputDisplay(outputArea,
+                            "❌ R support not available.\n\n" +
+                            "To enable R support:\n" +
+                            "1. Install Microsoft R Client or R\n" +
+                            "2. Install rpy2: pip install rpy2\n" +
+                            "3. Restart the server\n\n" +
+                            "Then try executing the R cell again.",
+                            OutputType.Error);
+                        return;
+                    }
+
+                    // Execute the code
+                    string languageStr = language == CellLanguage.Python ? "python" : "r";
+                    await RunCodeWithLanguage(code, outputArea, languageStr);
                 }
             }
             catch (Exception ex)
@@ -740,6 +837,94 @@ namespace ForeSITETestApp
             {
                 // Re-enable the editor
                 editor.IsReadOnly = false;
+            }
+        }
+
+        private async Task RunCodeWithLanguage(string code, TextBox outputArea, string language)
+        {
+            // Validate inputs
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                SetOutputDisplay(outputArea, "No code to execute.", OutputType.Warning);
+                return;
+            }
+
+            if (outputArea == null)
+            {
+                throw new ArgumentNullException(nameof(outputArea));
+            }
+            /*
+
+            if (language== "python")
+            {
+                // Basic Python syntax validation
+                var validationResult = ValidatePythonCode(code);
+                if (!validationResult.IsValid)
+                {
+                    SetOutputDisplay(outputArea, $"Syntax Error:\n{validationResult.ErrorMessage}", OutputType.Error);
+                    return;
+                }
+            }*/
+
+            // Show initial loading state
+            SetOutputDisplay(outputArea, $"Executing {language.ToUpper()} code...", OutputType.Info);
+
+            try
+            {
+                // Check if client is initialized
+                if (_notebookClient == null)
+                {
+                    SetOutputDisplay(outputArea,
+                        "Error: Notebook client not initialized.\nPlease restart the application.",
+                        OutputType.Error);
+                    return;
+                }
+
+                // Execute the code on the server
+                var executionResult = await _notebookClient.ExecuteCodeAsync(code, "code", language);
+
+                // Handle the response
+                await ProcessExecutionResult(executionResult, outputArea, code, language);
+            }
+            catch (TaskCanceledException)
+            {
+                SetOutputDisplay(outputArea,
+                    "Execution timed out.\nThe code took too long to execute (>60 seconds).\n" +
+                    "Try breaking your code into smaller chunks or optimizing performance.",
+                    OutputType.Error);
+            }
+            catch (HttpRequestException httpEx)
+            {
+                var errorMessage = $"Network Error: {httpEx.Message}\n\n";
+
+                if (httpEx.Message.Contains("refused") || httpEx.Message.Contains("timeout"))
+                {
+                    errorMessage += "Connection Issue:\n" +
+                                   "• Make sure Python/R server is running on port 5001\n" +
+                                   "• Check if port 5001 is blocked by firewall\n" +
+                                   "• Verify server address: http://127.0.0.1:5001";
+                }
+                else
+                {
+                    errorMessage += "Possible causes:\n" +
+                                   "• Python/R server is not running\n" +
+                                   "• Network connectivity issues\n" +
+                                   "• Server configuration problems";
+                }
+
+                SetOutputDisplay(outputArea, errorMessage, OutputType.Error);
+            }
+            catch (Exception ex)
+            {
+                SetOutputDisplay(outputArea,
+                    $"Unexpected Error: {ex.Message}\n\n" +
+                    "An unexpected error occurred while executing the code.\n" +
+                    $"Error Type: {ex.GetType().Name}\n" +
+                    "Please check the application logs for more details.",
+                    OutputType.Error);
+
+                // Log the full exception for debugging
+                System.Diagnostics.Debug.WriteLine($"RunCodeWithLanguage Exception: {ex}");
             }
         }
 
@@ -908,7 +1093,7 @@ namespace ForeSITETestApp
         /// <param name="code">Python code to execute</param>
         /// <param name="outputArea">TextBox where results will be displayed</param>
         /// <returns>Task representing the asynchronous operation</returns>
-        private async Task RunPythonCode(string code, TextBox outputArea)
+       /* private async Task RunPythonCode(string code, TextBox outputArea)
         {
             // Validate inputs
             if (string.IsNullOrWhiteSpace(code))
@@ -1008,7 +1193,7 @@ namespace ForeSITETestApp
                 // Log the full exception for debugging
                 System.Diagnostics.Debug.WriteLine($"RunPythonCode Exception: {ex}");
             }
-        }
+        }*/
 
         /// <summary>
         /// Processes the execution result from the Python server
@@ -1016,7 +1201,8 @@ namespace ForeSITETestApp
         /// <param name="result">Execution result from server</param>
         /// <param name="outputArea">Output display area</param>
         /// <param name="originalCode">Original code that was executed</param>
-        private async Task ProcessExecutionResult(ExecutionResult result, TextBox outputArea, string originalCode)
+        /// <param name="language">Language of the code (python or r)</param>
+        private async Task ProcessExecutionResult(ExecutionResult result, TextBox outputArea, string originalCode, string language)
         {
             if (result == null)
             {
@@ -1031,8 +1217,8 @@ namespace ForeSITETestApp
             var outputBuilder = new StringBuilder();
             var outputType = result.Success ? OutputType.Success : OutputType.Error;
 
-            // Add execution timestamp
-            outputBuilder.AppendLine($"[{DateTime.Now:HH:mm:ss}] Execution completed");
+            // Add execution timestamp with language indicator
+            outputBuilder.AppendLine($"[{DateTime.Now:HH:mm:ss}] {language.ToUpper()} execution completed");
             outputBuilder.AppendLine(new string('─', 50));
 
             // Add standard output (print statements, etc.)
@@ -1055,14 +1241,14 @@ namespace ForeSITETestApp
             if (!string.IsNullOrWhiteSpace(result.Error))
             {
                 outputBuilder.AppendLine("❌ Error:");
-                outputBuilder.AppendLine(FormatPythonError(result.Error));
+                outputBuilder.AppendLine(FormatCodeError(result.Error, language));
                 outputBuilder.AppendLine();
             }
 
-            // Handle matplotlib plots
+            // Handle plots (both Python matplotlib and R plots)
             if (result.HasPlot)
             {
-                outputBuilder.AppendLine("📈 Plot Generated:");
+                outputBuilder.AppendLine($"📈 {language.ToUpper()} Plot Generated:");
                 if (!string.IsNullOrWhiteSpace(result.PlotPath))
                 {
                     outputBuilder.AppendLine($"Saved to: {result.PlotPath}");
@@ -1073,7 +1259,6 @@ namespace ForeSITETestApp
                         outputBuilder.AppendLine("✅ Plot file created successfully");
 
                         // Optional: Open plot in default image viewer
-                        // You could add a button or automatic opening here
                         await Task.Run(() =>
                         {
                             try
@@ -1102,11 +1287,11 @@ namespace ForeSITETestApp
             if (result.Success)
             {
                 var codeLines = originalCode.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line.Trim())).Count();
-                outputBuilder.AppendLine($"✅ Execution successful ({codeLines} lines processed)");
+                outputBuilder.AppendLine($"✅ {language.ToUpper()} execution successful ({codeLines} lines processed)");
             }
             else
             {
-                outputBuilder.AppendLine("❌ Execution failed");
+                outputBuilder.AppendLine($"❌ {language.ToUpper()} execution failed");
             }
 
             // Display the formatted output
@@ -1118,7 +1303,7 @@ namespace ForeSITETestApp
         /// </summary>
         /// <param name="error">Raw error message from Python</param>
         /// <returns>Formatted error message</returns>
-        private string FormatPythonError(string error)
+        private string FormatCodeError(string error, string language)
         {
             if (string.IsNullOrWhiteSpace(error))
                 return "";
@@ -1132,26 +1317,49 @@ namespace ForeSITETestApp
                 if (string.IsNullOrEmpty(trimmedLine))
                     continue;
 
-                // Highlight common error types
-                if (trimmedLine.Contains("SyntaxError"))
+                if (language.ToLower() == "python")
                 {
-                    formattedError.AppendLine($"🔴 {trimmedLine}");
+                    // Python error formatting
+                    if (trimmedLine.Contains("SyntaxError"))
+                    {
+                        formattedError.AppendLine($"🔴 {trimmedLine}");
+                    }
+                    else if (trimmedLine.Contains("NameError"))
+                    {
+                        formattedError.AppendLine($"🟡 {trimmedLine}");
+                    }
+                    else if (trimmedLine.Contains("TypeError") || trimmedLine.Contains("ValueError"))
+                    {
+                        formattedError.AppendLine($"🟠 {trimmedLine}");
+                    }
+                    else if (trimmedLine.Contains("ImportError") || trimmedLine.Contains("ModuleNotFoundError"))
+                    {
+                        formattedError.AppendLine($"🟣 {trimmedLine}");
+                    }
+                    else if (trimmedLine.StartsWith("  File "))
+                    {
+                        formattedError.AppendLine($"📁 {trimmedLine}");
+                    }
+                    else
+                    {
+                        formattedError.AppendLine($"   {trimmedLine}");
+                    }
                 }
-                else if (trimmedLine.Contains("NameError"))
+                else if (language.ToLower() == "r")
                 {
-                    formattedError.AppendLine($"🟡 {trimmedLine}");
-                }
-                else if (trimmedLine.Contains("TypeError") || trimmedLine.Contains("ValueError"))
-                {
-                    formattedError.AppendLine($"🟠 {trimmedLine}");
-                }
-                else if (trimmedLine.Contains("ImportError") || trimmedLine.Contains("ModuleNotFoundError"))
-                {
-                    formattedError.AppendLine($"🟣 {trimmedLine}");
-                }
-                else if (trimmedLine.StartsWith("  File "))
-                {
-                    formattedError.AppendLine($"📁 {trimmedLine}");
+                    // R error formatting
+                    if (trimmedLine.Contains("Error:") || trimmedLine.Contains("Error in"))
+                    {
+                        formattedError.AppendLine($"🔴 {trimmedLine}");
+                    }
+                    else if (trimmedLine.Contains("Warning:") || trimmedLine.Contains("Warning in"))
+                    {
+                        formattedError.AppendLine($"🟡 {trimmedLine}");
+                    }
+                    else
+                    {
+                        formattedError.AppendLine($"   {trimmedLine}");
+                    }
                 }
                 else
                 {
@@ -1187,13 +1395,38 @@ namespace ForeSITETestApp
             if (!isRunning)
             {
                 MessageBox.Show(
-                    "Python server is not running or not accessible.\n\n" +
-                    "Please make sure the Python server is started:\n" +
+                    "Surv Server is not running or not accessible.\n\n" +
+                    "Please make sure the enhanced server is started:\n" +
                     "python epyflaServer.py\n\n" +
-                    "Server should be running on https://127.0.0.1:5001",
+                    "Server should be running on http://127.0.0.1:5001",
                     "Server Connection Warning",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+            }
+            else
+            {
+                // Check R availability
+                try
+                {
+                    var namespaceInfo = await _notebookClient.GetNamespaceAsync();
+                    _rAvailable = namespaceInfo.RAvailable;
+
+                    if (_rAvailable)
+                    {
+                        Title = "Notebook (Python + R)";
+                        _addRButton.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        Title = "Notebook (Python only)";
+                        _addRButton.Visibility = Visibility.Collapsed;
+                    }
+                }
+                catch
+                {
+                    _rAvailable = false;
+                    Title = "Notebook (Python only)";
+                }
             }
         }
 
@@ -1313,6 +1546,27 @@ namespace ForeSITETestApp
             }
         }
 
+        private CellLanguage DetermineCellLanguage(TextEditor editor, Label label)
+        {
+            // First try to get from editor tag
+            if (editor.Tag is CellLanguage tagLanguage)
+            {
+                return tagLanguage;
+            }
+
+            // Then try to determine from label content
+            var labelContent = label.Content?.ToString();
+            if (labelContent != null)
+            {
+                if (labelContent.Contains("Markdown")) return CellLanguage.Markdown;
+                if (labelContent.Contains("R")) return CellLanguage.R;
+                if (labelContent.Contains("Python")) return CellLanguage.Python;
+            }
+
+            // Default to Python
+            return CellLanguage.Python;
+        }
+
         /// <summary>
         /// Enhanced method to run all cells in the notebook
         /// </summary>
@@ -1342,7 +1596,7 @@ namespace ForeSITETestApp
                         if (editor != null && outputArea != null && label != null)
                         {
                             totalCells++;
-                            var cellType = label.Content.ToString() == "Code" ? CellType.Code : CellType.Markdown;
+                            var language = DetermineCellLanguage(editor, label);
 
                             // Show which cell is currently executing
                             var originalLabelContent = label.Content;
@@ -1350,7 +1604,11 @@ namespace ForeSITETestApp
 
                             try
                             {
-                                await RunCell(editor, outputArea, cellType);
+                               
+                                await RunCell(editor, outputArea, language);
+                                
+
+
 
                                 // Check if execution was successful by looking at output color
                                 if (outputArea.Background == Brushes.Black || outputArea.Background == Brushes.DarkBlue)
@@ -1365,7 +1623,7 @@ namespace ForeSITETestApp
                                 }
 
                                 // Small delay between cells to prevent overwhelming the server
-                                await Task.Delay(200);
+                                await Task.Delay(300);
                             }
                             catch
                             {
@@ -1441,9 +1699,35 @@ namespace ForeSITETestApp
 
                     if (editor != null && label != null)
                     {
+                        // Determine cell type and language
+                        var cellType = CellType.Code;
+                        var language = CellLanguage.Python; // Default
+
+                        var labelContent = label.Content.ToString();
+                        if (labelContent != null && labelContent.Contains("Markdown"))
+                        {
+                            cellType = CellType.Markdown;
+                            language = CellLanguage.Markdown;
+                        }
+                        else if (labelContent != null && (labelContent.Contains("R") || labelContent.Contains("📊")))
+                        {
+                            language = CellLanguage.R;
+                        }
+                        else if (labelContent != null && (labelContent.Contains("Python") || labelContent.Contains("🐍")))
+                        {
+                            language = CellLanguage.Python;
+                        }
+                        // For backward compatibility, check editor Tag if available
+                        else if (editor.Tag is CellLanguage tagLanguage)
+                        {
+                            language = tagLanguage;
+                        }
+
+
                         cells.Add(new NotebookCell
                         {
-                            CellType = label.Content.ToString().ToLower(),
+                            CellType = cellType.ToString(),
+                            Language = language.ToString(),
                             Source = editor.Text,
                             Output = outputArea?.Text ?? ""
                         });
@@ -1502,28 +1786,32 @@ namespace ForeSITETestApp
             }
         }
 
-        private void AddCodeCellWithContent(string content, string output = "")
+        private void AddCodeCellWithContent(string content, string output = "", CellLanguage language = CellLanguage.Python)
         {
             var cellPanel = CreateCellPanel();
             var cellContent = new StackPanel();
 
             var cellTypeLabel = new Label
             {
-                Content = "Code",
-                Background = Brushes.LightBlue,
+                Content = GetLanguageDisplayName(language),
+                Background = GetLanguageColor(language),
                 FontWeight = FontWeights.Bold,
                 Padding = new Thickness(5, 2, 5, 2)
             };
 
             var textEditor = new TextEditor
             {
-                SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("Python"),
+                SyntaxHighlighting = GetSyntaxHighlighting(language),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 MinHeight = 120,
                 Text = content,
                 FontSize = 12,
-                ShowLineNumbers = true
+                ShowLineNumbers = true,
+                Tag = language // Store language info for later reference
             };
+
+            // Track changes for unsaved changes detection
+            //textEditor.TextChanged += (s, e) => MarkAsChanged();
 
             var outputArea = new TextBox
             {
@@ -1532,13 +1820,15 @@ namespace ForeSITETestApp
                 Foreground = Brushes.LightGreen,
                 FontFamily = new FontFamily("Consolas"),
                 MinHeight = 60,
-                MaxHeight = 200,
+                MaxHeight = 300, // Increased max height
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Text = output,
+                TextWrapping = TextWrapping.NoWrap,
+                Text = output ?? string.Empty, // Null-safe assignment
                 Visibility = string.IsNullOrEmpty(output) ? Visibility.Collapsed : Visibility.Visible
             };
 
-            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, CellType.Code);
+            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, language);
 
             cellContent.Children.Add(cellTypeLabel);
             cellContent.Children.Add(textEditor);
@@ -1548,6 +1838,8 @@ namespace ForeSITETestApp
             cellPanel.Child = cellContent;
             _cellContainer.Children.Add(cellPanel);
         }
+
+        
 
         private void AddMarkdownCellWithContent(string content, string output = "")
         {
@@ -1567,9 +1859,10 @@ namespace ForeSITETestApp
                 SyntaxHighlighting = HighlightingManager.Instance.GetDefinition("MarkDown"),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 MinHeight = 120,
-                Text = content,
+                Text = content ?? string.Empty, // Null-safe assignment
                 FontSize = 12,
-                ShowLineNumbers = false
+                ShowLineNumbers = false,
+                Tag = CellLanguage.Markdown // Store language info for later reference
             };
 
             var outputArea = new TextBox
@@ -1578,13 +1871,15 @@ namespace ForeSITETestApp
                 Background = Brushes.White,
                 Foreground = Brushes.Black,
                 MinHeight = 60,
-                MaxHeight = 200,
+                MaxHeight = 300, // Increased max height for longer markdown content
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Text = output,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                TextWrapping = TextWrapping.Wrap, // Wrap text for markdown content
+                Text = output ?? string.Empty, // Null-safe assignment
                 Visibility = string.IsNullOrEmpty(output) ? Visibility.Collapsed : Visibility.Visible
             };
 
-            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, CellType.Markdown);
+            var buttonPanel = CreateCellButtonPanel(textEditor, outputArea, cellPanel, CellLanguage.Markdown);
 
             cellContent.Children.Add(cellTypeLabel);
             cellContent.Children.Add(textEditor);

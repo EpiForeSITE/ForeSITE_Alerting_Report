@@ -13,6 +13,7 @@ from flask import Flask, request, jsonify, abort
 from datetime import datetime, timedelta
 import pandas as pd
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import tempfile
 import uuid
@@ -28,6 +29,29 @@ import matplotlib.pyplot as plt
 import warnings
 import requests
 from sodapy import Socrata
+
+
+# R integration imports for rpy2 2.9.4
+try:
+    import rpy2.robjects as robjects
+    from rpy2.robjects import pandas2ri, numpy2ri
+    from rpy2.robjects.packages import importr
+    from rpy2.robjects.conversion import localconverter
+    import rpy2.rinterface as ri  # For rpy2 2.9.4
+    R_AVAILABLE = True
+    
+    # Enable automatic conversion between pandas and R
+    pandas2ri.activate()
+    numpy2ri.activate()
+    
+    # Suppress R warnings in console (for rpy2 2.9.4)
+    ri.set_writeconsole_warnerror(lambda x: None)
+    
+except ImportError as e:
+    R_AVAILABLE = False
+    print("R support not available. Install rpy2 to enable R functionality:")
+    print(f"Import error: {e}")
+    
 
 # -----------------------------------------------------------------------------
 # Author: Tao He (tao.he.2008@gmail.com)
@@ -59,35 +83,179 @@ GLOBAL_NAMESPACE = {
     'json': json
 }
 
+# R global environment (if available)
+R_GLOBAL_ENV = None
+if R_AVAILABLE:
+    R_GLOBAL_ENV = robjects.globalenv
+
+
 # Database configuration
 DATABASE_PATH = os.path.join(os.getcwd(), "foresite_alerting.db")
 print(f"Database path: {DATABASE_PATH}")
 
 documents_path = os.path.join(os.path.expanduser("~"), "Documents")
-log_file_path = os.path.join(documents_path, "flask_py_log.txt")
+#log_file_path = os.path.join(documents_path, "flask_py_log.txt")
 save_folder = os.path.join(documents_path, "ForeSITEAlertingReportFiles")
 
 # Ensure the directory exists and create the log file
 os.makedirs(documents_path, exist_ok=True)
 os.makedirs(save_folder, exist_ok=True)
 
-if not os.path.exists(log_file_path):
-    with open(log_file_path, 'a', encoding='utf-8') as f:
-        pass  # Create an empty file
+#if not os.path.exists(log_file_path):
+#    with open(log_file_path, 'a', encoding='utf-8') as f:
+#        pass  # Create an empty file
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='[%(asctime)s] [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler(log_file_path, mode='a', encoding='utf-8'),
-        logging.StreamHandler()  # Also log to console
-    ]
-)
+#logging.basicConfig(
+#    level=logging.INFO,
+#    format='[%(asctime)s] [%(levelname)s] %(message)s',
+#    handlers=[
+#        logging.FileHandler(log_file_path, mode='a', encoding='utf-8'),
+#        logging.StreamHandler()  # Also log to console
+#    ]
+#)
+
+# Create a custom logger for R execution
+#r_logger = logging.getLogger('r_execution')
+#r_logger.setLevel(logging.INFO)
+
+# Create a custom logger for general execution
+exec_logger = logging.getLogger('code_execution')
+exec_logger.setLevel(logging.INFO)
+
+
+def setup_robust_logging():
+    """
+    Set up robust logging that works reliably even with R execution
+    """
+    global exec_logger
+    
+    # Clear any existing handlers
+   
+    exec_logger.handlers = []
+    
+    # Create formatters
+    detailed_formatter = logging.Formatter(
+        '[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    simple_formatter = logging.Formatter(
+        '[%(asctime)s] %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    
+    # File handlers with rotation to prevent huge log files
+   
+    
+    exec_file_handler = RotatingFileHandler(
+        os.path.join(documents_path, "code_execution_log.txt"),
+        maxBytes=5*1024*1024,  # 5MB max file size
+        backupCount=3,
+        encoding='utf-8'
+    )
+    exec_file_handler.setLevel(logging.INFO)
+    exec_file_handler.setFormatter(detailed_formatter)
+    
+    # Console handler for development (optional, can be disabled for background)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.WARNING)  # Only warnings and errors to console
+    console_handler.setFormatter(simple_formatter)
+    
+    # Add handlers to loggers
+    
+    
+    exec_logger.addHandler(exec_file_handler)
+    exec_logger.addHandler(console_handler)
+    
+    # Prevent propagation to avoid duplicate messages
+    
+    exec_logger.propagate = False
+
+def safe_log(message, level='info'):
+    """
+    Safe logging function that always writes to files and handles errors gracefully
+    """
+    try:
+        logger =  exec_logger
+        
+        if level.lower() == 'error':
+            logger.error(message)
+        elif level.lower() == 'warning':
+            logger.warning(message)
+        elif level.lower() == 'debug':
+            logger.debug(message)
+        else:
+            logger.info(message)
+            
+        # Also force flush to ensure immediate write
+        for handler in logger.handlers:
+            if hasattr(handler, 'flush'):
+                handler.flush()
+                
+    except Exception as e:
+        # Fallback to direct file writing if logging fails
+        try:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            log_file = os.path.join(documents_path, f"code_execution_fallback.txt")
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{timestamp}] [FALLBACK] {message}\n")
+                f.flush()
+        except:
+            pass  # If even fallback fails, give up gracefully
+
 
 # Replace print so that print output also goes to the log
-def print(*args, **kwargs):
-    logging.info(' '.join(str(arg) for arg in args))
+# Also update the custom print function to be safer
+
+
+def safe_print(*args, **kwargs):
+    """
+    Enhanced safe print that logs to files AND can optionally print to console
+    """
+    try:
+        message = ' '.join(str(arg) for arg in args)
+        safe_log(message, 'info')
+        
+        # For development, also print to console (comment out for production)
+        # print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+        
+    except Exception:
+        # Absolute fallback - direct file write
+        try:
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            message = ' '.join(str(arg) for arg in args)
+            fallback_file = os.path.join(documents_path, "code_execution_emergency_log.txt")
+            with open(fallback_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{timestamp}] {message}\n")
+                f.flush()
+        except:
+            pass
+
+
+def safe_print_error(*args, **kwargs):
+    """
+    Enhanced safe error print that logs errors to files
+    """
+    try:
+        message = ' '.join(str(arg) for arg in args)
+        safe_log(message, 'error')
+        
+        # For development, also print to console
+        # print(f"[{datetime.now().strftime('%H:%M:%S')}] ERROR: {message}", file=sys.stderr)
+        
+    except Exception:
+        # Absolute fallback
+        try:
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            message = ' '.join(str(arg) for arg in args)
+            fallback_file = os.path.join(documents_path, "code_execution_emergency_error_log.txt")
+            with open(fallback_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{timestamp}] ERROR: {message}\n")
+                f.flush()
+        except:
+            pass
+
 
 class SafeStringIO(io.StringIO):
     """StringIO that captures both stdout and stderr safely"""
@@ -274,6 +442,10 @@ def execute_python_code(code, timeout=30):
     Returns:
         dict: Contains success status, output, error, and result
     """
+
+    safe_log("=== Starting Python Code Execution ===", 'info')
+    safe_log(f"Python Code to execute:\n{code[:500]}{'...' if len(code) > 500 else ''}", 'info')
+  
     try:
         # Create string buffers to capture output
         stdout_capture = SafeStringIO()
@@ -303,20 +475,24 @@ def execute_python_code(code, timeout=30):
             code = code.strip()
             if not code:
                 result['output'] = "No code to execute"
+                safe_log("No Python code provided", 'warning')
                 return result
             
             # First, try to validate the syntax
             try:
                 compile(code, '<string>', 'exec')
+                safe_log("Python code syntax validated", 'info')
             except SyntaxError as e:
                 result['success'] = False
                 result['error'] = f"Syntax Error: {str(e)}"
+                safe_log(f"Python syntax error: {str(e)}", 'error')
                 return result
 
             
             
             # Split code into logical blocks (respecting indentation)
             code_blocks = split_code_into_blocks(code)
+            safe_log(f"Split Python code into {len(code_blocks)} blocks", 'info')
 
 
             for i, block in enumerate(code_blocks):
@@ -324,6 +500,8 @@ def execute_python_code(code, timeout=30):
                     continue
                     
                 try:
+                    safe_log(f"Executing Python block {i+1}: {block[:100]}{'...' if len(block) > 100 else ''}", 'info')
+
                     # For the last block, try to evaluate as expression first
                     if i == len(code_blocks) - 1 and is_single_expression(block):
                         try:
@@ -331,6 +509,7 @@ def execute_python_code(code, timeout=30):
                             last_expr_result = eval(compiled_expr, GLOBAL_NAMESPACE, local_namespace)
                             if last_expr_result is not None:
                                 print(repr(last_expr_result))
+                                safe_log(f"Expression result: {repr(last_expr_result)}", 'info')
                         except SyntaxError:
                             # If it's not an expression, execute as statement
                             compiled_stmt = compile(block, '<string>', 'exec')
@@ -344,15 +523,18 @@ def execute_python_code(code, timeout=30):
                     error_msg = f"Error in code block: {str(e)}\nBlock content:\n{block}"
                     print(error_msg, file=sys.stderr)
                     print(traceback.format_exc(), file=sys.stderr)
+                    safe_log(f"Error in block {i+1}: {str(e)}", 'error')
                     result['success'] = False
                     break
             
             # Update global namespace with local variables
             GLOBAL_NAMESPACE.update(local_namespace)
+            safe_log("Updated global namespace", 'info')
             
         except Exception as e:
             print(f"Execution error: {str(e)}", file=sys.stderr)
             print(traceback.format_exc(), file=sys.stderr)
+            safe_log(f"Python execution error: {str(e)}", 'error')
             result['success'] = False
             
         finally:
@@ -363,13 +545,23 @@ def execute_python_code(code, timeout=30):
             # Get captured output
             result['output'] = stdout_capture.get_output()
             result['error'] = stderr_capture.get_output()
+
+            # Log the captured output
+            if result['output']:
+                safe_log(f"Python stdout: {result['output'][:300]}{'...' if len(result['output']) > 300 else ''}", 'info')
+            if result['error']:
+                safe_log(f"Python stderr: {result['error']}", 'error')
+            
             
             if last_expr_result is not None and result['success']:
                 result['result'] = format_result_for_display(last_expr_result)
-            
+        
+        safe_log(f"=== Python Code Execution Completed (Success: {result['success']}) ===", 'info')        
         return result
         
     except Exception as e:
+        error_msg = f"Python system error: {str(e)}"
+        safe_log(error_msg, 'error')
         return {
             'success': False,
             'output': '',
@@ -458,6 +650,371 @@ def format_result_for_display(obj):
     else:
         return str(obj)
 
+def clean_r_code(code):
+    """
+    Clean R code to remove problematic characters and normalize encoding
+    """
+    try:
+        # Convert to string if it isn't already
+        if not isinstance(code, str):
+            code = str(code)
+        
+        # Remove or replace problematic Unicode characters
+        # Replace various quotes with standard ASCII quotes
+        code = code.replace('"', '"').replace('"', '"')
+        code = code.replace(''', "'").replace(''', "'")
+        
+        # Remove BOM if present
+        if code.startswith('\ufeff'):
+            code = code[1:]
+        
+        # Normalize line endings
+        code = code.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Remove any non-printable characters except newlines, tabs, and standard spaces
+        import re
+        code = re.sub(r'[^\x20-\x7E\n\t]', '', code)
+        
+        return code
+        
+    except Exception as e:
+        safe_print_error(f"Error cleaning R code: {e}")
+        return code  # Return original if cleaning fails
+
+def parse_r_statements(code):
+    """
+    Parse R code into complete statements, handling multi-line constructs properly.
+    """
+    statements = []
+    current_statement = []
+    lines = code.split('\n')
+    
+    paren_count = 0
+    bracket_count = 0
+    brace_count = 0
+    in_string = False
+    string_char = None
+    
+    for line in lines:
+        stripped_line = line.strip()
+        
+        # Skip empty lines
+        if not stripped_line:
+            if current_statement:
+                current_statement.append(line)
+            continue
+            
+        # Handle comments - if it's a standalone comment, treat as separate statement
+        if stripped_line.startswith('#') and paren_count == 0 and bracket_count == 0 and brace_count == 0:
+            if current_statement:
+                statements.append('\n'.join(current_statement))
+                current_statement = []
+            statements.append(line)
+            continue
+        
+        # Add line to current statement
+        current_statement.append(line)
+        
+        # Count brackets and parentheses to detect multi-line statements
+        i = 0
+        while i < len(stripped_line):
+            char = stripped_line[i]
+            
+            # Handle string literals
+            if char in ['"', "'"] and not in_string:
+                in_string = True
+                string_char = char
+            elif char == string_char and in_string:
+                # Check if it's escaped
+                if i > 0 and stripped_line[i-1] != '\\':
+                    in_string = False
+                    string_char = None
+            
+            # Only count brackets outside of strings
+            if not in_string:
+                if char == '(':
+                    paren_count += 1
+                elif char == ')':
+                    paren_count -= 1
+                elif char == '[':
+                    bracket_count += 1
+                elif char == ']':
+                    bracket_count -= 1
+                elif char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+            
+            i += 1
+        
+        # If all brackets are balanced, we have a complete statement
+        if paren_count == 0 and bracket_count == 0 and brace_count == 0 and not in_string:
+            statements.append('\n'.join(current_statement))
+            current_statement = []
+    
+    # Add any remaining statement
+    if current_statement:
+        statements.append('\n'.join(current_statement))
+    
+    return statements
+
+
+def execute_r_code(code, timeout=30):
+    """
+     Execute R code safely and return the result.
+    Compatible with rpy2 2.9.4
+    
+    Args:
+        code (str): R code to execute
+        timeout (int): Maximum execution time in seconds
+        
+    Returns:
+        dict: Contains success status, output, error, and result
+    """
+    if not R_AVAILABLE:
+        return {
+            'success': False,
+            'output': '',
+            'error': 'R support not available. Please install rpy2 and R.',
+            'result': ''
+        }
+    
+    # Log the start of R execution
+    safe_log("=== Starting R Code Execution ===", 'info')
+    safe_log(f"R Code to execute:\n{code}", 'info')
+    
+    try:
+        # Create string buffers to capture output
+        stdout_capture = SafeStringIO()
+        stderr_capture = SafeStringIO()
+        
+        # Store original stdout/stderr
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        
+        result = {
+            'success': True,
+            'output': '',
+            'error': '',
+            'result': ''
+        }
+
+        # Note: We don't disable logging anymore - we use safe_log instead
+        
+        try:
+            # Redirect stdout and stderr
+            sys.stdout = stdout_capture
+            sys.stderr = stderr_capture
+            
+            # Clean and validate the code
+            code = code.strip()
+            if not code:
+                result['output'] = "No R code to execute"
+                safe_log("No R code provided", 'warning')
+                return result
+            
+            # Clean the code
+            cleaned_code = clean_r_code(code)
+            safe_log("Executing R code as single block...", 'info')
+            
+            try:
+                # Execute the entire code block at once
+                r_result = robjects.r(cleaned_code)
+                
+                # Log successful execution
+                safe_log("R code executed successfully", 'info')
+                
+                # If there's a result, capture it
+                if r_result is not None:
+                    try:
+                        result_str = str(r_result)
+                        safe_log(f"R execution result: {result_str[:200]}{'...' if len(result_str) > 200 else ''}", 'info')
+                        result['result'] = result_str
+                    except Exception as result_error:
+                        safe_log(f"Could not format R result: {result_error}", 'warning')
+                        result['result'] = "Code executed successfully (result not displayable)"
+                else:
+                    safe_log("R code executed successfully (NULL result)", 'info')
+                    result['result'] = "Code executed successfully"
+                        
+            except Exception as exec_error:
+                error_msg = f"Error executing R code: {str(exec_error)}"
+                safe_log(error_msg, 'error')
+                result['success'] = False
+            
+        except Exception as e:
+            error_msg = f"R execution error: {str(e)}"
+            safe_log(error_msg, 'error')
+            result['success'] = False
+            
+        finally:
+            # Restore original stdout/stderr
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            
+            # Get captured output
+            result['output'] = stdout_capture.get_output()
+            result['error'] = stderr_capture.get_output()
+            
+            # Log the captured output
+            if result['output']:
+                safe_log(f"R stdout: {result['output']}", 'info')
+            if result['error']:
+                safe_log(f"R stderr: {result['error']}", 'error')
+            
+        safe_log(f"=== R Code Execution Completed (Success: {result['success']}) ===", 'info')
+        return result
+        
+    except Exception as e:
+        error_msg = f"R system error: {str(e)}"
+        safe_log(error_msg, 'error')
+        return {
+            'success': False,
+            'output': '',
+            'error': error_msg,
+            'result': ''
+        }
+
+def handle_matplotlib_plots():
+    """
+    Handle matplotlib plots by saving them and returning base64 data
+    """
+    try:
+        if plt.get_fignums():  # Check if there are any open figures
+            # Save current figure to base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
+            buffer.seek(0)
+            
+            # Convert to base64
+            plot_data = base64.b64encode(buffer.getvalue()).decode()
+            
+            # Also save to file
+            plot_filename = f"plot_{uuid.uuid4().hex[:8]}.png"
+            plot_path = os.path.join(save_folder, plot_filename)
+            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+            
+            plt.close('all')  # Close all figures
+            
+            return {
+                'has_plot': True,
+                'plot_data': plot_data,
+                'plot_path': plot_path
+            }
+    except Exception as e:
+        print(f"Error handling matplotlib plots: {str(e)}")
+    
+    return {'has_plot': False}
+
+
+def handle_r_plots():
+    """Handle R plots by saving them (compatible with rpy2 2.9.4)"""
+    try:
+        if not R_AVAILABLE:
+            return {'has_plot': False}
+            
+        # Temporarily disable logging for R operations
+        logging.getLogger().disabled = True
+        # Check if there are any open R graphics devices
+        try:
+            # Check if there are any open R graphics devices
+            r_check = robjects.r('length(dev.list())')
+            safe_print(f"Number of R devices: {r_check[0]}")
+
+            if r_check[0] > 0:
+                plot_filename = f"r_plot_{uuid.uuid4().hex[:8]}.png"
+                plot_path = os.path.join(save_folder, plot_filename)
+                safe_print(f"Attempting to save R plot to: {plot_path}")
+
+                # Method 1: Try dev.print() - more reliable for existing plots
+                try:
+                    robjects.r(f'dev.print(png, "{plot_path.replace(chr(92), "/")}", width=800, height=600)')
+                    safe_print("Used dev.print() method")
+                    
+                    # Check if file was created and has content
+                    if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
+                        return {
+                            'has_plot': True,
+                            'plot_path': plot_path
+                        }
+                        
+                except Exception as e1:
+                    safe_print_error(f"dev.print() failed: {e1}")
+                    
+                    # Method 2: Try recordPlot and replayPlot approach
+                    try:
+                        # Record the current plot
+                        robjects.r('recorded_plot <- recordPlot()')
+                        
+                        # Open PNG device
+                        robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
+                        
+                        # Replay the plot
+                        robjects.r('replayPlot(recorded_plot)')
+                        
+                        # Close the device
+                        robjects.r('dev.off()')
+                        
+                        safe_print("Used recordPlot/replayPlot method")
+                        
+                        # Check if file was created and has content
+                        if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
+                            return {
+                                'has_plot': True,
+                                'plot_path': plot_path
+                            }
+                            
+                    except Exception as e2:
+                        safe_print_error(f"recordPlot/replayPlot failed: {e2}")
+                        
+                        # Method 3: Alternative approach using dev.copy
+                        try:
+                            # Open a new PNG device
+                            png_dev = robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
+                            
+                            # Get current device
+                            current_dev = robjects.r('dev.cur()')[0]
+                            safe_print(f"Current device: {current_dev}")
+                            
+                            if current_dev > 1:  # Device 1 is null device
+                                # Copy from current device to PNG
+                                robjects.r('dev.copy(which = dev.cur())')
+                                
+                            # Close the PNG device
+                            robjects.r('dev.off()')
+                            
+                            safe_print("Used alternative dev.copy method")
+                            
+                            # Check if file was created and has content
+                            if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
+                                return {
+                                    'has_plot': True,
+                                    'plot_path': plot_path
+                                }
+                                
+                        except Exception as e3:
+                            safe_print_error(f"Alternative dev.copy failed: {e3}")
+                
+                # If all methods failed, clean up empty file
+                if os.path.exists(plot_path) and os.path.getsize(plot_path) == 0:
+                    os.remove(plot_path)
+                    safe_print_error("Removed empty plot file")
+                    
+        except Exception as plot_error:
+            safe_print_error(f"R plot handling error: {plot_error}")
+            
+        finally:
+            # Re-enable logging
+            logging.getLogger().disabled = False
+            
+    except Exception as e:
+        safe_print_error(f"Error in R plot handling: {str(e)}")
+        # Re-enable logging in case of error
+        logging.getLogger().disabled = False
+    
+    return {'has_plot': False}
+
+
 def get_data_source_by_name_from_db(name):
     """
     Get a specific data source by name from the database
@@ -484,7 +1041,7 @@ def get_data_source_by_name_from_db(name):
             return None
             
     except Exception as e:
-        print(f"Error retrieving data source '{name}' from database: {e}")
+        safe_log(f"Error retrieving data source '{name}' from database: {e}")
         return None
 
 def generate_simulation_data(start_date='2019-01-01',
@@ -522,7 +1079,7 @@ def generate_simulation_data(start_date='2019-01-01',
     # Add n_outbreak_cases column based on the threshold
     df['n_outbreak_cases'] = df['n_cases'].apply(lambda x: max(0, x - outbreak_threshold))
 
-    print(f"Generated simulation data from {start_date} to {end_date}.")
+    safe_log(f"Generated simulation data from {start_date} to {end_date}.")
     return df
 
 def getCdcData(resourceUri):
@@ -547,7 +1104,7 @@ def getCdcData(resourceUri):
         results_df = pd.DataFrame.from_records(all_results)
         return results_df
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
+        safe_log(f"Error fetching data: {e}")
         return None
 
 def get_resource_uri(datasource):
@@ -576,7 +1133,7 @@ def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
         return df2020
     else:
          cdcdf = getCdcData(resourceUri=get_resource_uri(datasource))
-         print("CDC DataFrame:", cdcdf)
+         safe_log("CDC DataFrame:", cdcdf)
          if cdcdf is not None:
              df_week=cdcdf[cdcdf['mmwr_week']>='1']
              df_week_us=df_week[df_week['state']=='United States']
@@ -590,7 +1147,7 @@ def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
                    cdcdf=df_week_us[['start_date', 'end_date', 'mmwr_week',  'influenza_deaths' ]]
                    cdcdf = cdcdf.rename(columns={"influenza_deaths": "n_cases"})        
              else:
-                print("Invalid data source provided.")
+                safe_log("Invalid data source provided.")
                 return None
              # 转换为 datetime 类型
              cdcdf["start_date"] = pd.to_datetime(cdcdf["start_date"])
@@ -603,7 +1160,7 @@ def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
              df['n_outbreak_cases'] = df['n_cases'].apply(lambda x: 0 if x <= threshold else x - threshold)
              return df
          else:
-             print("No data found for the specified data source.")
+             safe_log("No data found for the specified data source.")
              return None
 
    
@@ -669,26 +1226,26 @@ def run_farrington_model_bydatesplit(df, train_end_date, alpha=0.05, years_back=
     if 'n_cases' not in df.columns:
         raise ValueError("Input DataFrame must contain an 'n_cases' column.")
  
-    print(df.index)
+    safe_log(df.index)
     # 用 train/test date 训练
     train = df.loc[:train_end_date, ['n_cases', 'n_outbreak_cases']].copy()
     test = df.loc[train_end_date:, ['n_cases', 'n_outbreak_cases']].copy()
-    print(train.index)
-    print("Train size:", len(train), "Test size:", len(test))
-    print(test.index)
+    safe_log(train.index)
+    safe_log("Train size:", len(train), "Test size:", len(test))
+    safe_log(test.index)
 
     model = FarringtonFlexible(alpha=alpha, years_back=years_back)
-    print("Fitting FarringtonFlexible model...", model)
+    safe_log("Fitting FarringtonFlexible model...", model)
     model.fit(train)
-    print("Model fitting complete.")
+    safe_log("Model fitting complete.")
     predictions = model.predict(test)
-    print("Predictions:", predictions)
+    safe_log("Predictions:", predictions)
   
     df_full = df.copy()
     df_full['threshold'] = np.nan
     df_full.loc[predictions.index, 'threshold'] = predictions['upperbound']
     df_full['expected'] = train['n_cases'].mean()
-    print(df_full)
+    safe_log(df_full)
 
     return df_full, predictions, train
 
@@ -759,9 +1316,9 @@ def plot_farrington_results(df_full,
 
     try:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Plot saved to: {save_path}")
+        safe_log(f"Plot saved to: {save_path}")
     except Exception as e:
-        print(f"Failed to save plot: {e}")
+        safe_log(f"Failed to save plot: {e}")
     finally:
         plt.close()
 
@@ -808,21 +1365,21 @@ def generate_plot_from_data(df,
     train = df.iloc[:train_size].copy()
     test = df.iloc[train_size:].copy()
 
-    print(f"Splitting data: {len(train)} training points, {len(test)} testing points.")
+    safe_log(f"Splitting data: {len(train)} training points, {len(test)} testing points.")
 
     # Initialize and fit the FarringtonFlexible model
     
 
 
     model = FarringtonFlexible(alpha=alpha, years_back=years_back)
-    print("Fitting FarringtonFlexible model...")
+    safe_log("Fitting FarringtonFlexible model...")
     model.fit(train)
-    print("Model fitting complete.")
+    safe_log("Model fitting complete.")
 
     # Predict on the test set
-    print("Making predictions...")
+    safe_log("Making predictions...")
     predictions = model.predict(test)
-    print("Predictions complete.")
+    safe_log("Predictions complete.")
     # print("Prediction Columns:", predictions.columns) # Optional: for debugging
 
     # Prepare data for visualization
@@ -880,14 +1437,14 @@ def generate_plot_from_data(df,
     save_dir = os.path.dirname(save_path)
     if save_dir and not os.path.exists(save_dir):
         os.makedirs(save_dir)
-        print(f"Created directory: {save_dir}")
+        safe_log(f"Created directory: {save_dir}")
 
     # Save the plot
     try:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Plot saved successfully to: {save_path}")
+        safe_log(f"Plot saved successfully to: {save_path}")
     except Exception as e:
-        print(f"Error saving plot to {save_path}: {e}")
+        safe_log(f"Error saving plot to {save_path}: {e}")
     finally:
         plt.close() # Close the plot to free memory
 
@@ -899,23 +1456,23 @@ def process_json():
     """
     # 1. 检查是否来自 localhost
     if request.remote_addr != '127.0.0.1':
-        print(f"Rejected request from non-localhost: {request.remote_addr}")
+        safe_log(f"Rejected request from non-localhost: {request.remote_addr}")
         abort(403, description="Only localhost requests are allowed.")
 
     # 2. 检查 Content-Type
     if not request.is_json:
-        print(f"Invalid Content-Type: {request.content_type}")
+        safe_log(f"Invalid Content-Type: {request.content_type}")
         abort(400, description="Content-Type must be application/json.")
 
     # 3. 尝试获取 JSON 数据
     try:
         received_data = request.get_json()
-        print(f"Received JSON data: {received_data}")
+        safe_log(f"Received JSON data: {received_data}")
 
         if received_data is None:
             raise ValueError("Empty or malformed JSON.")
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
+        safe_log(f"Error parsing JSON: {e}")
         abort(400, description=f"Invalid JSON: {e}")
 
     # 4. 检查 graph 字段
@@ -927,7 +1484,7 @@ def process_json():
     # 5. 提取参数（带默认值）
     try:
         graph = received_data["graph"]
-        print(f"Graph type: {graph}")
+        safe_log(f"Graph type: {graph}")
         model = graph.get("Model", "farrington")
         datasource = graph.get("DataSource", "Covid-19 Deaths")
         title = graph.get("Title", "Farrington Outbreak Detection Simulation")
@@ -937,16 +1494,16 @@ def process_json():
         trainSplitRatio = float(graph.get("TrainSplitRatio", 0.70))
         train_end_date = datetime(2024, 12, 31)
 
-        print(f"Model: {model}, DataSource: {datasource}, Title: {title}, YearBack: {yearback}, \
+        safe_log(f"Model: {model}, DataSource: {datasource}, Title: {title}, YearBack: {yearback}, \
                 UseTrainSplit: {useTrainSplit}, Threshold: {threshold}, TrainSplitRatio: {trainSplitRatio}")
 
         if not useTrainSplit:
             train_end_date = pd.to_datetime(graph.get("TrainEndDate"))
            
-            print(f"Using TrainEndDate: {train_end_date}")
+            safe_log(f"Using TrainEndDate: {train_end_date}")
 
     except Exception as e:
-        print(f"Parameter error: {e}")
+        safe_log(f"Parameter error: {e}")
         abort(400, description=f"Invalid parameters: {e}")
 
     import uuid
@@ -955,15 +1512,15 @@ def process_json():
 
     # 6. 生成图像路径
     output_plot_path = (f"farrington_plot_{unique_id}.png")
-    print(f"Output plot path: {output_plot_path}")
+    safe_log(f"Output plot path: {output_plot_path}")
 
     save_img = os.path.join(save_folder, output_plot_path) 
     try:
         # 7. 根据数据源处理数据
-        print(datasource)
+        safe_log(datasource)
         if datasource == "COVID-19 Tests":
-            print("Using local data source for COVID-19 test data.")
-            print("Current working directory:", os.getcwd())
+            safe_log("Using local data source for COVID-19 test data.")
+            safe_log("Current working directory:", os.getcwd())
             df2020 = pd.read_csv("local_covid_19_test_data.csv")
             df2020['date'] = pd.to_datetime(df2020['date'])  # Ensure 'date' is datetime type
             df2020 = df2020.set_index('date')
@@ -978,7 +1535,7 @@ def process_json():
             )
         elif datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
         # 7. 获取数据
-            print(datasource)
+            safe_log(datasource)
             try:
                cdc_data = generate_cdc_data(datasource, threshold=threshold)
                # Create a complete date range (daily frequency)
@@ -988,11 +1545,11 @@ def process_json():
                cdc_data.index = pd.date_range(start=cdc_data.index[0], periods=len(cdc_data), freq='W-SUN')
 
                
-               print(cdc_data)
-               print(cdc_data.index)
+               safe_log(cdc_data)
+               safe_log(cdc_data.index)
         
             except Exception as e:
-               print(f"Data generation failed: {e}")
+               safe_log(f"Data generation failed: {e}")
                abort(500, description="Data generation failed.")
 
             if useTrainSplit:
@@ -1021,11 +1578,11 @@ def process_json():
             )
         else:
             # Check database for custom data source
-            print(f"Looking up custom data source '{datasource}' in database...")
+            safe_log(f"Looking up custom data source '{datasource}' in database...")
             db_datasource = get_data_source_by_name_from_db(datasource)
             
             if db_datasource:
-                print(f"Found data source in database: {db_datasource}")
+                safe_log(f"Found data source in database: {db_datasource}")
                 
                 # Get the DataURL from database
                 data_url = db_datasource.get('data_url', '')
@@ -1033,28 +1590,28 @@ def process_json():
                 if not data_url:
                     raise ValueError(f"Data source '{datasource}' found in database but has no DataURL")
                 
-                print(f"Loading CSV data from: {data_url}")
+                safe_log(f"Loading CSV data from: {data_url}")
                 
                 # Check if it's a local file path or URL
                 if os.path.isfile(data_url):
                     # Local file
-                    print(f"Loading local CSV file: {data_url}")
+                    safe_log(f"Loading local CSV file: {data_url}")
                     custom_data = pd.read_csv(data_url)
                 elif data_url.startswith(('http://', 'https://')):
                     # Remote URL
-                    print(f"Loading CSV from URL: {data_url}")
+                    safe_log(f"Loading CSV from URL: {data_url}")
                     custom_data = pd.read_csv(data_url)
                 else:
                     # Try as relative path
-                    print(f"Trying as relative path: {data_url}")
+                    safe_log(f"Trying as relative path: {data_url}")
                     if os.path.isfile(data_url):
                         custom_data = pd.read_csv(data_url)
                     else:
                         raise FileNotFoundError(f"CSV file not found: {data_url}")
                 
                 # Process the loaded data
-                print(f"Loaded CSV data with shape: {custom_data.shape}")
-                print(f"Columns: {custom_data.columns.tolist()}")
+                safe_log(f"Loaded CSV data with shape: {custom_data.shape}")
+                safe_log(f"Columns: {custom_data.columns.tolist()}")
 
                 
                 
@@ -1077,7 +1634,7 @@ def process_json():
                 if not date_column:
                     # Use first column as date
                     date_column = custom_data.columns[0]
-                    print(f"No date column found, using first column as date: {date_column}")
+                    safe_log(f"No date column found, using first column as date: {date_column}")
                 
                 if not case_column:
                     # Use second column as cases, or first numeric column
@@ -1086,7 +1643,7 @@ def process_json():
                         case_column = numeric_cols[0]
                     else:
                         case_column = custom_data.columns[1] if len(custom_data.columns) > 1 else custom_data.columns[0]
-                    print(f"No case column found, using: {case_column}")
+                    safe_log(f"No case column found, using: {case_column}")
                 
                 # Process the data
                 try:
@@ -1108,12 +1665,12 @@ def process_json():
                     # Remove any rows with NaN values
                     custom_data = custom_data.dropna(subset=['n_cases'])
                     
-                    print(f"Processed data shape: {custom_data.shape}")
-                    print(f"Date range: {custom_data.index.min()} to {custom_data.index.max()}")
-                    print(f"Case range: {custom_data['n_cases'].min()} to {custom_data['n_cases'].max()}")
+                    safe_log(f"Processed data shape: {custom_data.shape}")
+                    safe_log(f"Date range: {custom_data.index.min()} to {custom_data.index.max()}")
+                    safe_log(f"Case range: {custom_data['n_cases'].min()} to {custom_data['n_cases'].max()}")
                     
                 except Exception as e:
-                    print(f"Error processing CSV data: {e}")
+                    safe_log(f"Error processing CSV data: {e}")
                     raise ValueError(f"Failed to process CSV data from '{data_url}': {str(e)}")
                 
                 # Generate plot using the custom data
@@ -1144,11 +1701,11 @@ def process_json():
             else:
                 # Data source not found in database
                 error_msg = f"Data source '{datasource}' not found in known sources or database"
-                print(error_msg)
+                safe_log(error_msg)
                 abort(400, description=error_msg)
 
     except Exception as e:
-        print(f"Plot generation error: {e}")
+        safe_log(f"Plot generation error: {e}")
         abort(500, description=f"Plot generation failed: {e}")
 
     # 8. 返回响应
@@ -1160,39 +1717,23 @@ def process_json():
 
     })
 
-    print(f"Response data: {response_data}")
+    safe_log(f"Response data: {response_data}")
     return jsonify(response_data), 200
 
-def handle_matplotlib_plots():
-    """
-    Handle matplotlib plots by saving them and returning base64 data
-    """
+
+# Alternative simplified R plot checking function
+def check_for_r_plots():
+    """Simple check to see if R has created any plots"""
     try:
-        if plt.get_fignums():  # Check if there are any open figures
-            # Save current figure to base64
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
-            buffer.seek(0)
+        if not R_AVAILABLE:
+            return False
             
-            # Convert to base64
-            plot_data = base64.b64encode(buffer.getvalue()).decode()
-            
-            # Also save to file
-            plot_filename = f"plot_{uuid.uuid4().hex[:8]}.png"
-            plot_path = os.path.join(save_folder, plot_filename)
-            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
-            
-            plt.close('all')  # Close all figures
-            
-            return {
-                'has_plot': True,
-                'plot_data': plot_data,
-                'plot_path': plot_path
-            }
-    except Exception as e:
-        print(f"Error handling matplotlib plots: {str(e)}")
-    
-    return {'has_plot': False}
+        # Check if there are graphics devices with plots
+        r_result = robjects.r('length(dev.list())')
+        return r_result[0] > 0
+        
+    except Exception:
+        return False
 
 # New route for code execution
 @app.route('/execute', methods=['POST'])
@@ -1202,22 +1743,22 @@ def execute_code():
     """
     # Check if request is from localhost
     if request.remote_addr != '127.0.0.1':
-        print(f"Rejected request from non-localhost: {request.remote_addr}")
+        safe_print(f"Rejected request from non-localhost: {request.remote_addr}")
         abort(403, description="Only localhost requests are allowed.")
 
     # Check Content-Type
     if not request.is_json:
-        print(f"Invalid Content-Type: {request.content_type}")
+        safe_print(f"Invalid Content-Type: {request.content_type}")
         abort(400, description="Content-Type must be application/json.")
 
     try:
         received_data = request.get_json()
-        print(f"Received execution request: {received_data}")
+        safe_print(f"Received execution request: {received_data}")
 
         if received_data is None:
             raise ValueError("Empty or malformed JSON.")
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
+        safe_print_error(f"Error parsing JSON: {e}")
         abort(400, description=f"Invalid JSON: {e}")
 
     # Extract code from request
@@ -1226,23 +1767,42 @@ def execute_code():
 
     code = received_data["code"]
     cell_type = received_data.get("cell_type", "code")
+    language = received_data.get("language", "python")  # New field for language
 
-    print(f"Executing {cell_type} cell with code length: {len(code)}")
+
+    safe_print(f"Executing {language} {cell_type} cell with code length: {len(code)}")
+
 
     try:
-        # Execute the code
         if cell_type == "code":
-            result = execute_python_code(code)
-            
-            # Check for matplotlib plots
-            plot_info = handle_matplotlib_plots()
-            if plot_info['has_plot']:
-                result['plot_data'] = plot_info['plot_data']
-                result['plot_path'] = plot_info['plot_path']
-                result['has_plot'] = True
-            else:
-                result['has_plot'] = False
-            
+            # Execute based on language
+            if language.lower() == "r":
+                result = execute_r_code(code)
+                
+                # Check for R plots with better handling
+                if check_for_r_plots():
+                    plot_info = handle_r_plots()
+                    if plot_info['has_plot']:
+                        result['plot_path'] = plot_info['plot_path']
+                        result['has_plot'] = True
+                        safe_print(f"R plot saved successfully to: {plot_info['plot_path']}")
+                    else:
+                        result['has_plot'] = False
+                        safe_print("R plot detection failed or plot is empty")
+                else:
+                    result['has_plot'] = False
+                    
+            else:  # Default to Python
+                result = execute_python_code(code)
+                
+                # Check for matplotlib plots
+                plot_info = handle_matplotlib_plots()
+                if plot_info['has_plot']:
+                    result['plot_data'] = plot_info['plot_data']
+                    result['plot_path'] = plot_info['plot_path']
+                    result['has_plot'] = True
+                else:
+                    result['has_plot'] = False
         else:
             # For non-code cells, just return the content
             result = {
@@ -1252,11 +1812,11 @@ def execute_code():
                 'result': code
             }
 
-        print(f"Execution completed. Success: {result['success']}")
+        safe_print(f"Execution completed. Success: {result['success']}")
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"Code execution error: {e}")
+        safe_print_error(f"Code execution error: {e}")
         error_result = {
             'success': False,
             'output': '',
@@ -1275,50 +1835,109 @@ def get_namespace():
     if request.remote_addr != '127.0.0.1':
         abort(403, description="Only localhost requests are allowed.")
     
-    # Filter out built-ins and modules for cleaner output
-    user_vars = {}
+    # Python variables
+    python_vars = {}
     for key, value in GLOBAL_NAMESPACE.items():
         if not key.startswith('_') and key not in ['__builtins__', 'np', 'pd', 'plt', 'datetime', 'os', 'sys', 'json']:
             try:
-                # Try to get a string representation
                 str_repr = str(value)
                 if len(str_repr) > 100:
                     str_repr = str_repr[:100] + "..."
-                user_vars[key] = {
+                python_vars[key] = {
                     'type': type(value).__name__,
-                    'value': str_repr
+                    'value': str_repr,
+                    'language': 'python'
                 }
             except:
-                user_vars[key] = {
+                python_vars[key] = {
                     'type': type(value).__name__,
-                    'value': '<unable to display>'
+                    'value': '<unable to display>',
+                    'language': 'python'
                 }
     
+    # R variables
+    r_vars = {}
+    if R_AVAILABLE:
+        try:
+            # Get R variable names (compatible with rpy2 2.9.4)
+            r_ls = robjects.r('ls()')
+            for var_name in r_ls:
+                try:
+                    r_obj = robjects.r[var_name]
+                    r_class = robjects.r('class')(r_obj)[0]
+                    r_str = str(r_obj)
+                    if len(r_str) > 100:
+                        r_str = r_str[:100] + "..."
+                    
+                    r_vars[var_name] = {
+                        'type': r_class,
+                        'value': r_str,
+                        'language': 'r'
+                    }
+                except Exception as e:
+                    r_vars[var_name] = {
+                        'type': 'unknown',
+                        'value': f'<error: {str(e)}>',
+                        'language': 'r'
+                    }
+        except Exception as e:
+            print(f"Error getting R variables: {e}")
+    
+    # Combine variables
+    all_vars = {}
+    all_vars.update(python_vars)
+    all_vars.update(r_vars)
+    
+    available_modules = ['numpy as np', 'pandas as pd', 'matplotlib.pyplot as plt', 'datetime', 'os', 'sys', 'json']
+    if R_AVAILABLE:
+        available_modules.append('R (via rpy2 2.9.4)')
+    
     return jsonify({
-        'variables': user_vars,
-        'available_modules': ['numpy as np', 'pandas as pd', 'matplotlib.pyplot as plt', 'datetime', 'os', 'sys', 'json']
+        'variables': all_vars,
+        'available_modules': available_modules,
+        'r_available': R_AVAILABLE
     })
 
-# New route for clearing the namespace
+
+# Enhanced clear namespace route
 @app.route('/clear_namespace', methods=['POST'])
 def clear_namespace():
-    """
-    Clear user-defined variables from the global namespace.
-    """
+    """Clear user-defined variables from both Python and R namespaces."""
     if request.remote_addr != '127.0.0.1':
         abort(403, description="Only localhost requests are allowed.")
     
-    # Keep only the essential modules and built-ins
-    keys_to_remove = []
-    for key in GLOBAL_NAMESPACE.keys():
-        if key not in ['__builtins__', 'np', 'pd', 'plt', 'datetime', 'os', 'sys', 'json']:
-            keys_to_remove.append(key)
-    
-    for key in keys_to_remove:
-        del GLOBAL_NAMESPACE[key]
-    
-    return jsonify({'status': 'success', 'message': 'Namespace cleared'})
-
+    try:
+        received_data = request.get_json()
+        language = received_data.get('language', 'both') if received_data else 'both'
+        
+        if language in ['python', 'both']:
+            # Clear Python variables
+            keys_to_remove = []
+            for key in GLOBAL_NAMESPACE.keys():
+                if key not in ['__builtins__', 'np', 'pd', 'plt', 'datetime', 'os', 'sys', 'json']:
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del GLOBAL_NAMESPACE[key]
+        
+        if language in ['r', 'both'] and R_AVAILABLE:
+            # Clear R variables (compatible with rpy2 2.9.4)
+            try:
+                robjects.r('rm(list=ls())')
+            except Exception as e:
+                safe_log(f"Error clearing R variables: {e}")
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'Namespace cleared for {language}',
+            'language': language
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error clearing namespace: {str(e)}'
+        }), 500
 
 
 # New route for adding data source variables to namespace
@@ -1329,22 +1948,22 @@ def add_variable():
     """
     # Check if request is from localhost
     if request.remote_addr != '127.0.0.1':
-        print(f"Rejected request from non-localhost: {request.remote_addr}")
+        safe_log(f"Rejected request from non-localhost: {request.remote_addr}")
         abort(403, description="Only localhost requests are allowed.")
 
     # Check Content-Type
     if not request.is_json:
-        print(f"Invalid Content-Type: {request.content_type}")
+        safe_log(f"Invalid Content-Type: {request.content_type}")
         abort(400, description="Content-Type must be application/json.")
 
     try:
         received_data = request.get_json()
-        print(f"Received add variable request: {received_data}")
+        safe_log(f"Received add variable request: {received_data}")
 
         if received_data is None:
             raise ValueError("Empty or malformed JSON.")
     except Exception as e:
-        print(f"Error parsing JSON: {e}")
+        safe_log(f"Error parsing JSON: {e}")
         abort(400, description=f"Invalid JSON: {e}")
 
     # Extract required parameters
@@ -1373,12 +1992,12 @@ def add_variable():
         }), 200
 
     try:
-        print(f"Creating data source variable: {variable_name} from {datasource}")
+        safe_log(f"Creating data source variable: {variable_name} from {datasource}")
 
         # Generate data based on datasource
         if datasource == "COVID-19 Tests":
-            print("Using local data source for COVID-19 test data.")
-            print("Current working directory:", os.getcwd())
+            safe_log("Using local data source for COVID-19 test data.")
+            safe_log("Current working directory:", os.getcwd())
             df = pd.read_csv("local_covid_19_test_data.csv")
             df['date'] = pd.to_datetime(df['date'])  # Ensure 'date' is datetime type
             df = df.set_index('date')
@@ -1396,11 +2015,11 @@ def add_variable():
        
         else:
             # Check database for custom data source
-            print(f"Looking up custom data source '{datasource}' in database...")
+            safe_log(f"Looking up custom data source '{datasource}' in database...")
             db_datasource = get_data_source_by_name_from_db(datasource)
             
             if db_datasource:
-                print(f"Found data source in database: {db_datasource}")
+                safe_log(f"Found data source in database: {db_datasource}")
 
                 # Get the DataURL from database
                 data_url = db_datasource.get('data_url', '')
@@ -1408,28 +2027,28 @@ def add_variable():
                 if not data_url:
                     raise ValueError(f"Data source '{datasource}' found in database but has no DataURL")
                 
-                print(f"Loading CSV data from: {data_url}")
+                safe_log(f"Loading CSV data from: {data_url}")
                 
                 # Check if it's a local file path or URL
                 if os.path.isfile(data_url):
                     # Local file
-                    print(f"Loading local CSV file: {data_url}")
+                    safe_log(f"Loading local CSV file: {data_url}")
                     df = pd.read_csv(data_url)
                 elif data_url.startswith(('http://', 'https://')):
                     # Remote URL
-                    print(f"Loading CSV from URL: {data_url}")
+                    safe_log(f"Loading CSV from URL: {data_url}")
                     df = pd.read_csv(data_url)
                 else:
                     # Try as relative path
-                    print(f"Trying as relative path: {data_url}")
+                    safe_log(f"Trying as relative path: {data_url}")
                     if os.path.isfile(data_url):
                         df = pd.read_csv(data_url)
                     else:
                         raise FileNotFoundError(f"CSV file not found: {data_url}")
                 
                 # Process the loaded data
-                print(f"Loaded CSV data with shape: {df.shape}")
-                print(f"Columns: {df.columns.tolist()}")
+                safe_log(f"Loaded CSV data with shape: {df.shape}")
+                safe_log(f"Columns: {df.columns.tolist()}")
                 
                 # Try to identify date and case columns
                 date_column = None
@@ -1450,7 +2069,7 @@ def add_variable():
                 if not date_column:
                     # Use first column as date
                     date_column = df.columns[0]
-                    print(f"No date column found, using first column as date: {date_column}")
+                    safe_log(f"No date column found, using first column as date: {date_column}")
                 
                 if not case_column:
                     # Use second column as cases, or first numeric column
@@ -1459,7 +2078,7 @@ def add_variable():
                         case_column = numeric_cols[0]
                     else:
                         case_column = df.columns[1] if len(df.columns) > 1 else df.columns[0]
-                    print(f"No case column found, using: {case_column}")
+                    safe_log(f"No case column found, using: {case_column}")
                 
                 # Process the data
                 try:
@@ -1481,16 +2100,16 @@ def add_variable():
                     # Remove any rows with NaN values
                     df = df.dropna(subset=['n_cases'])
                     
-                    print(f"Processed data shape: {df.shape}")
-                    print(f"Date range: {df.index.min()} to {df.index.max()}")
-                    print(f"Case range: {df['n_cases'].min()} to {df['n_cases'].max()}")
+                    safe_log(f"Processed data shape: {df.shape}")
+                    safe_log(f"Date range: {df.index.min()} to {df.index.max()}")
+                    safe_log(f"Case range: {df['n_cases'].min()} to {df['n_cases'].max()}")
                 except Exception as e:
-                    print(f"Error processing CSV data: {e}")
+                    safe_log(f"Error processing CSV data: {e}")
                     raise ValueError(f"Failed to process CSV data from '{data_url}': {str(e)}")
                     
             else:
                   # Data source not found in database, try simulation as fallback
-                print(f"Data source '{datasource}' not found in database, generating simulation data")
+                safe_log(f"Data source '{datasource}' not found in database, generating simulation data")
                 raise ValueError(f"Unknown datasource: {datasource}")
 
         # Add the dataframe to global namespace
@@ -1508,7 +2127,7 @@ def add_variable():
             'memory_usage': f"{df.memory_usage(deep=True).sum() / 1024:.2f} KB" if hasattr(df, 'memory_usage') else 'N/A'
         }
 
-        print(f"Successfully created variable '{variable_name}' with shape {df.shape}")
+        safe_log(f"Successfully created variable '{variable_name}' with shape {df.shape}")
 
         return jsonify({
             'status': 'success',
@@ -1522,7 +2141,7 @@ def add_variable():
 
     except Exception as e:
         error_message = f"Failed to create variable from datasource: {str(e)}"
-        print(f"Add variable error: {error_message}")
+        safe_log(f"Add variable error: {error_message}")
         
         return jsonify({
             'status': 'error',
@@ -1556,8 +2175,18 @@ def method_not_allowed(error):
      return response
 
 if __name__ == '__main__':
-    print(f"Starting Epy Flask server on https://localhost:{PORT}")
-    print("Only accepting JSON POST requests to /process from localhost.")
+
+    # Initialize the enhanced logging system
+    setup_robust_logging()
+
+    # Log server startup
+    safe_log("=== Flask Server Starting ===", 'info')
+    safe_log(f"Server starting on port {PORT}", 'info')
+    safe_log(f"R Available: {R_AVAILABLE}", 'info')
+    safe_log(f"Log files location: {documents_path}", 'info')
+
+    #print(f"Starting Epy Flask server on https://localhost:{PORT}")
+    #print("Only accepting JSON POST requests to /process from localhost.")
 
     # --- Option 1: Use Flask's ad-hoc SSL certificate (Easy for Development) ---
     # This generates temporary self-signed certificates.
@@ -1577,11 +2206,11 @@ if __name__ == '__main__':
          # ssl_context enables HTTPS.
          app.run(host='127.0.0.1', port=PORT, debug=True)
     except ImportError:
-         print("Error: 'cryptography' library not found.")
-         print("Please install it for ad-hoc SSL certificate generation:")
-         print("  pip install cryptography")
+         safe_log("Error: 'cryptography' library not found.")
+         safe_log("Please install it for ad-hoc SSL certificate generation:")
+         safe_log("  pip install cryptography")
     except FileNotFoundError:
-         print("Error: Could not find 'cert.pem' or 'key.pem'.")
-         print("Make sure certificate files are generated and in the correct path if using Option 2.")
+         safe_log("Error: Could not find 'cert.pem' or 'key.pem'.")
+         safe_log("Make sure certificate files are generated and in the correct path if using Option 2.")
     except Exception as e:
-         print(f"An error occurred during server startup: {e}")
+         safe_log(f"An error occurred during server startup: {e}")

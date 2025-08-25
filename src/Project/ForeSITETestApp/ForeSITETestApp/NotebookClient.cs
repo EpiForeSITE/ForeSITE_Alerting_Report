@@ -21,6 +21,7 @@ namespace ForeSITETestApp
             _httpClient = httpClient;
         }
 
+
         /// <summary>
         /// Execute Python code on the server
         /// </summary>
@@ -29,12 +30,25 @@ namespace ForeSITETestApp
         /// <returns>Execution result</returns>
         public async Task<ExecutionResult> ExecuteCodeAsync(string code, string cellType = "code")
         {
+            return await ExecuteCodeAsync(code, cellType, "python");
+        }
+
+
+        /// Execute code on the server with language specification
+        /// </summary>
+        /// <param name="code">Code to execute</param>
+        /// <param name="cellType">Type of cell (code or markdown)</param>
+        /// <param name="language">Programming language (python or r)</param>
+        /// <returns>Execution result</returns>
+        public async Task<ExecutionResult> ExecuteCodeAsync(string code, string cellType = "code", string language = "python")
+        {
             try
             {
                 var requestData = new
                 {
                     code = code,
-                    cell_type = cellType
+                    cell_type = cellType,
+                    language = language.ToLower()
                 };
 
                 var json = JsonConvert.SerializeObject(requestData);
@@ -83,6 +97,7 @@ namespace ForeSITETestApp
             }
         }
 
+
         /// <summary>
         /// Get the current namespace variables from the server
         /// </summary>
@@ -116,14 +131,18 @@ namespace ForeSITETestApp
         }
 
         /// <summary>
-        /// Clear the server's namespace
+        /// Clear the server's namespace for specified language
         /// </summary>
+        /// <param name="language">Language to clear (python, r, or both)</param>
         /// <returns>True if successful</returns>
-        public async Task<bool> ClearNamespaceAsync()
+        public async Task<bool> ClearNamespaceAsync(string language = "both")
         {
             try
             {
-                var content = new StringContent("{}", Encoding.UTF8, "application/json");
+                var requestData = new { language = language.ToLower() };
+                var json = JsonConvert.SerializeObject(requestData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
                 var response = await _httpClient.PostAsync("/clear_namespace", content);
                 return response.IsSuccessStatusCode;
             }
@@ -132,6 +151,7 @@ namespace ForeSITETestApp
                 return false;
             }
         }
+
 
         /// <summary>
         /// Check if the server is running and accessible
@@ -143,6 +163,23 @@ namespace ForeSITETestApp
             {
                 var response = await _httpClient.GetAsync("/namespace");
                 return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Check if R support is available on the server
+        /// </summary>
+        /// <returns>True if R is available</returns>
+        public async Task<bool> IsRAvailableAsync()
+        {
+            try
+            {
+                var namespaceInfo = await GetNamespaceAsync();
+                return namespaceInfo.RAvailable;
             }
             catch
             {

@@ -49,11 +49,20 @@ namespace ForeSITETestApp
         Markdown
     }
 
-    
+    // Enhanced NotebookWindow with R support
+    public enum CellLanguage
+    {
+        Python,
+        R,
+        Markdown
+    }
+
 
     public class NotebookCell
     {
         public string CellType { get; set; }
+
+        public string Language { get; set; }
         public string Source { get; set; }
         public string Output { get; set; }
     }
@@ -103,6 +112,8 @@ namespace ForeSITETestApp
         [JsonProperty("available_modules")]
         public List<string> AvailableModules { get; set; } = new List<string>();
 
+        [JsonProperty("r_available")]
+        public bool RAvailable { get; set; } = false;
         public string Error { get; set; } = "";
     }
 
@@ -116,7 +127,11 @@ namespace ForeSITETestApp
 
         [JsonProperty("value")]
         public string Value { get; set; } = "";
+
+        public string Language { get; set; } = "python";
     }
+
+   
 
     /// <summary>
     /// Request for epidemiological analysis
