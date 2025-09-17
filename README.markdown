@@ -3,7 +3,7 @@
 <img src="images/foreSITEAlertingReport_icon2.jpg" alt="ForeSITE Alerting Report Logo" width="200"/>
 
 
-**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, PdfSharpCore, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
+**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, QuestPDF, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
 
 ## Features
 
@@ -24,8 +24,9 @@
 We’ve added support for Windows scheduled tasks to automate report delivery.
 Users can now configure a schedule (daily, weekly, or monthly) directly within the application. Once set, the system will automatically:
 - Generate updated reports based on the latest data
-- Export them to PDF
+- Export them to PDF (change PdfSharpCore to QuestPDF)
 - Send them to the specified recipients via email
+
 This means reports are sent hands-free and on time, according to your preferred schedule—no manual steps required.
 
 ### Version 0.7 
@@ -52,18 +53,18 @@ This means reports are sent hands-free and on time, according to your preferred 
 - **Python**: Python 3.7 or later (for Flask server and epySurv package)
 - **Dependencies**:
   - **WPF Application**:
-    - [PdfSharpCore](https://github.com/ststeiger/PdfSharpCore) for PDF generation
+    - [QuestPDF](https://github.com/QuestPDF/QuestPDF)for PDF generation
     - [Newtonsoft.Json](https://www.newtonsoft.com/json) for JSON parsing
-    - **TODO** Microsoft Outlook (for automated email delivery)
+    - Google SMTP for automated email delivery
   - **Flask Server**:
     - Flask
     - `epySurv` (surveillance data processing module, assumed to be a custom or external library)
     - Other Python dependencies (e.g., `pandas`, `matplotlib` for data processing and plotting)
 - **Tools**:
   - Visual Studio 2022 or later (with WPF development workload)
-  - **TODO** PowerShell (for scheduled task execution)
+  - PowerShell (for scheduled task execution)
   - Python environment (e.g., Anaconda, virtualenv)
-- **TODO: Administrative Privileges**: Required for creating scheduled tasks
+- **Administrative Privileges**: Required for creating scheduled tasks
 -
 
 ## Installation From Source Code
@@ -160,13 +161,14 @@ This release includes the ForeSITE Alerting Report application, featuring integr
 2. Delete data sources:
    - Select sources and click "Delete".
 
-### TODO: Scheduling Automated Reports
-1. Navigate to the "Scheduler" tab.
-2. Click "Scheduling" to create a Windows Task Scheduler task:
-   - **Task Name**: `MonthlyReportGeneration`
-   - **Schedule**: First day of each month at 8:00 AM
-   - **Action**: Runs `GenerateReport.ps1` to generate a PDF (`C:\Reports\Report_YYYYMM.pdf`) and email it via Outlook.
-3. Ensure the Flask server is running and the application is run as administrator.
+### Scheduling Automated Reports
+1. Navigate to the "Report" tab.
+2. Click "Scheduling" to create a task template JSON file.
+3. Navigae to the "Scheduler" tab:
+   - **Id**: We can see our task file path and we can edit/input email addresses to receive our report
+   - **Schedule**: we can see the start date and freq options for our task
+   - **Start/End**: Runs to setup our task on/off in windows task list.
+4. Ensure the application is run as administrator.
 
 
 
@@ -208,7 +210,7 @@ ForeSITE-Alerting-Report/
 │   ├── ReportElement.cs       # Report element model
 │   ├── PlotTitleDialog.xaml   # Dialog for plot titles
 │   └── ForeSITETestApp.sln    # Solution file
-├── Python/
+├── Server/
 │   ├── epyflaServer.py        # Flask server for epySurv integration
 │   └── requirements.txt       # Python dependencies
 │   
@@ -219,14 +221,18 @@ ForeSITE-Alerting-Report/
 ## Dependencies
 
 - **C# WPF Application**:
-  - PdfSharpCore: For PDF generation
+  - QuestDF: For PDF generation
   - Newtonsoft.Json: For API response parsing
+  - MailKit: For Email notification
 
 - **Flask Server**:
   - Flask: Web server framework
   - epySurv: Surveillance data processing module
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
-- **TODO: Windows Task Scheduler**: For scheduling automated reports
+    
+## Scheduler Start Screen
+Start a windows task for our application
+![SchedulerScreen](images/Screenshot2025-09-17.png)
 
 ## Animation Demo
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
