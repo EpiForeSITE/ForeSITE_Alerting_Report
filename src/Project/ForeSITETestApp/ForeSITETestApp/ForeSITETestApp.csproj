@@ -18,13 +18,13 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="OllamaSharp" Version="5.2.2" />
-    <PackageReference Include="PDFsharp" Version="6.2.0" />
+    <PackageReference Include="QuestPDF" Version="2025.7.1" />
     <PackageReference Include="Quicker.AvalonEdit" Version="6.3.1" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.6" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="config.json">
+    <None Update="Server\config.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Fonts\arial.ttf">
@@ -33,19 +33,20 @@
     <None Update="Fonts\georgia.ttf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Python\epyflaServer.py">
+    <None Update="Server\epyflaServer.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="farrington_plot.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
-    <None Update="Python\local_covid_19_test_data.csv">
+    <None Update="Server\local_covid_19_test_data.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Fonts\" />
+    <Folder Include="Server\Models\" />
   </ItemGroup>
 
 </Project>

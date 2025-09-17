@@ -6,59 +6,59 @@
             xmlns:local="clr-namespace:ForeSITETestApp"
             mc:Ignorable="d" 
             d:DesignHeight="800" d:DesignWidth="1000">
-   <UserControl.Resources>
-       <ResourceDictionary>
-           <ResourceDictionary.MergedDictionaries>
-               <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Button.xaml" />
-               <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.CheckBox.xaml" />
-               <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Shadows.xaml" />
-               <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.ToggleButton.xaml" />
-           </ResourceDictionary.MergedDictionaries>
-           <Style x:Key="NavButtonStyle" TargetType="Button">
-               <Setter Property="Background" Value="Transparent"/>
-               <Setter Property="Foreground" Value="White"/>
-               <Setter Property="Padding" Value="10"/>
-               <Setter Property="Margin" Value="5"/>
-               <Setter Property="BorderThickness" Value="0"/>
-               <Setter Property="HorizontalContentAlignment" Value="Left"/>
-               <Setter Property="Template">
-                   <Setter.Value>
-                       <ControlTemplate TargetType="Button">
-                           <Border Background="{TemplateBinding Background}" CornerRadius="3">
-                               <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
-                           </Border>
-                           <ControlTemplate.Triggers>
-                               <Trigger Property="IsMouseOver" Value="True">
-                                   <Setter Property="Background" Value="#34495E"/>
-                               </Trigger>
-                           </ControlTemplate.Triggers>
-                       </ControlTemplate>
-                   </Setter.Value>
-               </Setter>
-           </Style>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Button.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.CheckBox.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Shadows.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.ToggleButton.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="NavButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Padding" Value="10"/>
+                <Setter Property="Margin" Value="5"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#34495E"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
-           <Style x:Key="HeaderButtonStyle" TargetType="Button">
-               <Setter Property="Background" Value="#3498DB"/>
-               <Setter Property="Foreground" Value="White"/>
-               <Setter Property="Padding" Value="10,5"/>
-               <Setter Property="BorderThickness" Value="0"/>
-               <Setter Property="Template">
-                   <Setter.Value>
-                       <ControlTemplate TargetType="Button">
-                           <Border Background="{TemplateBinding Background}" CornerRadius="3">
-                               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                           </Border>
-                           <ControlTemplate.Triggers>
-                               <Trigger Property="IsMouseOver" Value="True">
-                                   <Setter Property="Background" Value="#2980B9"/>
-                               </Trigger>
-                           </ControlTemplate.Triggers>
-                       </ControlTemplate>
-                   </Setter.Value>
-               </Setter>
-           </Style>
-       </ResourceDictionary>
-   </UserControl.Resources>
+            <Style x:Key="HeaderButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#3498DB"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Padding" Value="10,5"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#2980B9"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
 
     <Grid>
         <!-- Defining grid layout: 1 column for sidebar, 1 for main content -->
@@ -78,6 +78,7 @@
                 <Button x:Name="SchedulerButton" Content="Scheduler" Style="{StaticResource NavButtonStyle}" Margin="5" Click="SchedulerButton_Click"/>
                 <Button x:Name="ReportButton" Content="Reporter" Style="{StaticResource NavButtonStyle}" Margin="5" Click="ReportButton_Click"/>
                 <Button x:Name="DataSourceButton" Content="Data Source Manager" Style="{StaticResource NavButtonStyle}" Margin="5" Click="DataSourceButton_Click"/>
+                <Button x:Name="ModelButton" Content="Model Manager" Style="{StaticResource NavButtonStyle}" Margin="5" Click="ModelButton_Click"/>
                 <Button x:Name="SettingButton" Content="Settings" Style="{StaticResource NavButtonStyle}" Margin="5"/>
             </StackPanel>
         </Border>
@@ -102,7 +103,7 @@
             </Border>
 
             <!-- Content Area with Switchable Grids -->
-            <Grid Grid.Row="1" Margin="20">
+            <Grid x:Name="btnAddModule" Grid.Row="1" Margin="20">
                 <!-- Default Content Grid -->
                 <Grid x:Name="DefaultContentGrid" Visibility="Visible">
                     <Grid.ColumnDefinitions>
@@ -138,38 +139,113 @@
                 <!-- Scheduler Grid -->
                 <Grid x:Name="SchedulerGrid" Visibility="Collapsed">
                     <StackPanel Margin="0,0,10,0">
-                        <!-- Chart Format Selection -->
-                        <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Chart Format" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                <RadioButton Content="PDF" GroupName="ChartFormat" Margin="0,5,0,5" IsChecked="True"/>
-                                <RadioButton Content="HTML" GroupName="ChartFormat" Margin="0,5,0,5"/>
-                            </StackPanel>
+
+                      
+                        <!-- Recipient Emails + Scheduler Table -->
+                        <Border Background="White" CornerRadius="8" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <!-- Label -->
+                                    <RowDefinition Height="Auto"/>
+                                    <!-- Recipient -->
+                                    <RowDefinition Height="*"  />
+                                    <!-- Scheduler table -->
+                                    <RowDefinition Height="Auto"/>
+                                    <!-- Bittons -->
+                                </Grid.RowDefinitions>
+
+                                <!-- Label -->
+                                <TextBlock Grid.Row="0"
+                                    Text="Recipient's Emails"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Margin="0,0,0,5"/>
+
+                                <!-- Recipient（one line for one email address） -->
+                                <TextBox x:Name="RecipientEmailsBox"
+                                    Grid.Row="1"
+                                    AcceptsReturn="True"
+                                    MinHeight="60"
+                                    TextWrapping="Wrap"
+                                    ToolTip="Enter email addresses, one per line"/>
+
+                                <!-- Scheduler Table : include checkbox -->
+                                <DataGrid x:Name="SchedulerTable"
+                                    Grid.Row="2"
+                                    Margin="0,10,0,10"
+                                    AutoGenerateColumns="False"
+                                    CanUserAddRows="False"
+                                    HeadersVisibility="Column"
+                                    RowHeaderWidth="0"
+                                    SelectionMode="Extended"
+                                    SelectionUnit="FullRow">
+                                    <DataGrid.Columns>
+                                        <!-- 勾选列 -->
+                                        <!-- 勾选列（带 Click 事件） -->
+                                        <DataGridTemplateColumn Header="" Width="60">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected}"
+                                                       Click="SchedulerSelectCheckBox_Click"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+
+
+                                        <!-- Id 列 -->
+                                        <DataGridTextColumn Header="Id"
+                                        Width="60"
+                                        Binding="{Binding Id}"
+                                        IsReadOnly="True"/>
+
+                                        <!-- 新增 Recipients 列 -->
+                                        <DataGridTextColumn Header="Recipients"
+                                        Width="200"
+                                        Binding="{Binding Recipients}"/>
+
+                                        <!-- 原有 AttachmentPath 列 -->
+                                        <DataGridTextColumn Header="AttachmentPath"
+                                        Width="*"
+                                        Binding="{Binding AttachmentPath}"/>
+
+                                        <!-- StartDate 列 -->
+                                        <DataGridTextColumn Header="StartDate"
+                                        Width="140"
+                                        Binding="{Binding StartDate}"/>
+
+                                        <!-- Freq 列 -->
+                                        <DataGridTextColumn Header="Freq"
+                                        Width="120"
+                                        Binding="{Binding Freq}"/>
+                                    </DataGrid.Columns>
+
+                                </DataGrid>
+
+                                <!-- 操作按钮 -->
+                                <StackPanel Grid.Row="3"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                                    <Button Content="Delete"  Margin="0,0,10,0" Padding="14,6" Click="SchedulerDelete_Click"/>
+                                    <Button Content="Save"    Margin="0,0,10,0" Padding="14,6" Click="SchedulerSave_Click"/>
+                                    <Button Content="Start"   Margin="0,0,10,0" Padding="14,6" Click="SchedulerStart_Click"/>
+                                    <Button Content="End"                    Padding="14,6" Click="SchedulerEnd_Click"/>
+                                </StackPanel>
+                            </Grid>
                         </Border>
 
-                        <!-- Recipient Emails -->
-                        <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Recipient's Emails" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                <TextBox AcceptsReturn="True" Height="100" TextWrapping="Wrap" ToolTip="Enter email addresses, one per line"/>
-                            </StackPanel>
-                        </Border>
 
-                        <!-- Date/Time Selection -->
-                        <Border Background="White" CornerRadius="5" Margin="0,0,0,10" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Schedule Date/Time" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                <DatePicker Margin="0,5,0,5"/>
-                            </StackPanel>
-                        </Border>
+
                     </StackPanel>
                 </Grid>
                 <!-- Reports Grid -->
                 <Grid x:Name="ReportsGrid" Visibility="Collapsed">
-                    
+
                     <StackPanel Margin="0,0,10,0">
                         <StackPanel Margin="0,0,0,20">
-                            
+
                             <Border Background="White" CornerRadius="5" Padding="15" BorderBrush="#E0E0E0" BorderThickness="1">
                                 <Grid x:Name="LoadDataButton1">
                                     <Grid.ColumnDefinitions>
@@ -217,11 +293,11 @@
                                         <CheckBox x:Name="TrainSplitCheckBox" Content="Use Train Split Ratio" IsChecked="True" Checked="TrainSplitCheckBox_Checked" Unchecked="TrainSplitCheckBox_Unchecked"/>
                                         <TextBox x:Name="TrainSplitRatioInput" Width="150" Margin="0,10,0,0"  />
                                         <StackPanel x:Name="DatePickersPanel" Orientation="Horizontal" Margin="0,10,0,0" Visibility="Collapsed">
-                                            
-                                                <TextBlock Text="Train End Date" FontSize="12" Margin="0,0,0,3"/>
-                                                <DatePicker x:Name="TrainEndDatePicker" Width="150"/>
-                                        
-                                            
+
+                                            <TextBlock Text="Train End Date" FontSize="12" Margin="0,0,0,3"/>
+                                            <DatePicker x:Name="TrainEndDatePicker" Width="150"/>
+
+
                                         </StackPanel>
                                     </StackPanel>
 
@@ -238,7 +314,7 @@
                                                 <ComboBox x:Name="FreqSelector" SelectedIndex="0" Width="150" HorizontalAlignment="Left">
                                                     <ComboBoxItem Content="By Week"/>
                                                     <ComboBoxItem Content="By Month"/>
-                                                    <ComboBoxItem Content="By Quart"/>
+                                                    <ComboBoxItem Content="By Day"/>
                                                 </ComboBox>
                                             </StackPanel>
                                         </StackPanel>
@@ -252,7 +328,8 @@
 
                                     <!-- Action Buttons -->
                                     <StackPanel Grid.Row="0" Grid.Column="4" Grid.RowSpan="3" Orientation="Vertical" Margin="10,0,0,0" VerticalAlignment="Center">
-                                        <Button x:Name="AddTitleButton" Content="Add Title\Comment"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
+                                        <Button x:Name="AddTitleButton" Content="Add Title"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
+                                        <Button x:Name="AddCommentButton" Content="Add Comment"  Margin="0,0,0,10" Click="AddCommentButton_Click" />
                                         <Button x:Name="AddPlotButton" Content="Add Plot" Margin="0,0,0,10" Click="AddPlotButton_ClickAsync" />
                                         <Button x:Name="AddNotebookButton" Content="Data Analysis"   Click="AddNotebookButton_Click" />
                                     </StackPanel>
@@ -289,6 +366,7 @@
                                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
                                                 <DataGridTextColumn Header="Data Uri" Binding="{Binding DataURL}" Width="*"/>
                                                 <DataGridTextColumn Header="Resource Uri" Binding="{Binding ResourceURL}" Width="*"/>
+                                                <DataGridTextColumn Header="App Token" Binding="{Binding AppToken}" Width="*"/>
                                                 <DataGridCheckBoxColumn Header="Real Time" Binding="{Binding IsRealtime}" Width="100"/>
                                                 <DataGridCheckBoxColumn Header="Select" Binding="{Binding IsSelected}" Width="100"/>
                                             </DataGrid.Columns>
@@ -303,9 +381,158 @@
                         </Border>
                     </StackPanel>
                 </Grid>
+
+                <!--Model Management Grid-->
+                <Grid x:Name="ModelGrid" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+
+                    </Grid.RowDefinitions>
+
+                    <!-- 顶部标题和按钮 -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <Button x:Name="btnAddNewModel" Content="Add Model" Margin="5" Padding="8,3" Click="btnAddModel_Click"/>
+                            <Button x:Name="btnDeleteModel" Content="Delete Model" Margin="5" Padding="8,3" Click="btnDeleteModel_Click"/>
+                        </StackPanel>
+                    </Grid>
+                    <!-- 中间主要内容区域 -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="250"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+
+
+
+                        <!-- Left Model list -->
+                        <Border Grid.Column="0" BorderThickness="1" BorderBrush="#DDDDDD" Background="#F5F5F5">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="Module List" Padding="10,5" Background="#EEEEEE" />
+                                <ListBox x:Name="lstModel" Margin="5" SelectionChanged="lstModel_SelectionChanged">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Vertical" Margin="3">
+                                                <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding Type}" Foreground="Gray" FontSize="11"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Right Property List -->
+                        <Grid Grid.Column="1" Margin="10,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Base Information -->
+                            <Border Grid.Row="0" BorderThickness="1" BorderBrush="#DDDDDD" Padding="10" Background="#F9F9F9">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Full Name:" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtFullModuleName" Margin="0,0,20,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Variable Name:" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Row="0" Grid.Column="3" x:Name="txtModuleName" Margin="0,0,20,5"/>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="4" Text="Type:" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Row="0" Grid.Column="5" x:Name="cmbModelType" Margin="0,0,0,5">
+                                        <ComboBoxItem Content="Python"/>
+                                        <ComboBoxItem Content="R"/>
+                                    </ComboBox>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" Margin="0,5,10,0" VerticalAlignment="Top"/>
+                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" x:Name="txtModuleDescription" 
+                             Margin="0,5,0,0" TextWrapping="Wrap" AcceptsReturn="True" Height="60" 
+                             VerticalScrollBarVisibility="Auto"/>
+
+                                    <Button Grid.Row="1" Grid.Column="5" x:Name="btnSaveModel" Content="Save" 
+                            HorizontalAlignment="Right" Margin="0,10,0,0" Padding="8,3" Click="btnSaveModel_Click"/>
+
+                                </Grid>
+                            </Border>
+
+                            <!-- Property List -->
+                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0" Text="Property" FontWeight="Bold"/>
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button x:Name="btnAddProperty" Content="Add Property" Margin="5,0" Padding="8,3" Click="btnAddProperty_Click"/>
+                                        <Button x:Name="btnDeleteProperty" Content="Del Property" Margin="5,0" Padding="8,3" Click="btnDeleteProperty_Click"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <DataGrid Grid.Row="1" x:Name="dgProperties" Margin="0,5,0,0" AutoGenerateColumns="False" 
+                          CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False" 
+                          HeadersVisibility="Column" SelectionMode="Single" 
+                          CellEditEnding="dgProperties_CellEditEnding">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Property Name" Binding="{Binding Name}" Width="*"/>
+                                        <DataGridTemplateColumn Header="Type" Width="*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Type}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                            <DataGridTemplateColumn.CellEditingTemplate>
+                                                <DataTemplate>
+                                                    <ComboBox SelectedValue="{Binding Type, UpdateSourceTrigger=PropertyChanged}">
+                                                        <ComboBoxItem Content="int"/>
+                                                        <ComboBoxItem Content="float"/>
+                                                        <ComboBoxItem Content="string"/>
+                                                        <ComboBoxItem Content="int_list"/>
+                                                        <ComboBoxItem Content="str_list"/>
+                                                    </ComboBox>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellEditingTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="Default Value" Binding="{Binding DefaultValue}" Width="*"/>
+                                        <DataGridCheckBoxColumn Header="Show on UI" Binding="{Binding DisplayInUI}" Width="0.5*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
             </Grid>
         </Grid>
 
-       
+
     </Grid>
 </UserControl>

@@ -1,7 +1,0 @@
-{
-  "pythonPath": "epysurv-env\\python.exe",
-  "scriptPath": "Python\\epyflaServer.py",
-  "logPath": "",
-  "activateCommand": "epysurv-env\\Scripts\\activate.bat",
-  "envName": "epysurv-dev"
-}

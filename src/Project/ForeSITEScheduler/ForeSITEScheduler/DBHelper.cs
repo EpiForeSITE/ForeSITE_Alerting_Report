@@ -1,4 +1,5 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using ForeSITEScheduler;
+using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
 using System.Collections.ObjectModel;
 using System.Data;
@@ -6,7 +7,7 @@ using System.IO;
 using System.Text;
 
 
-namespace ForeSITETestApp
+namespace SchedulerRunner
 {
     public class DBHelper
     {

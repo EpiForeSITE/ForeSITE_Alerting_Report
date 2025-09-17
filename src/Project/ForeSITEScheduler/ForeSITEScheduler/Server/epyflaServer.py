@@ -30,27 +30,113 @@ import warnings
 import requests
 from sodapy import Socrata
 
+# Load and process config file for R environment setup
+def load_config_and_setup_r():
+    """
+    Load config.json and set up R environment variables before importing rpy2
+    """
+    try:
+        # Get current script directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, "config.json")
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            
+            r_path = config.get('RPath', '')
+            if r_path:
+                # Check if RPath is relative
+                if not os.path.isabs(r_path):
+                    # For relative paths, use parent directory of script
+                    parent_dir = os.path.dirname(script_dir)
+                    r_home = os.path.join(parent_dir, r_path)
+                else:
+                    # Use absolute path as-is
+                    r_home = r_path
+                
+                # Normalize the path
+                r_home = os.path.normpath(r_home)
+                
+                # Set R_HOME environment variable
+                os.environ['R_HOME'] = r_home
+                
+                # Add R bin to PATH if it exists
+                r_bin = os.path.join(r_home, 'bin')
+                if os.path.exists(r_bin):
+                    current_path = os.environ.get('PATH', '')
+                    os.environ['PATH'] = current_path + os.pathsep + r_bin
+                
+                print(f"Config loaded: R_HOME set to {r_home}")
+                print(f"R bin directory: {r_bin}")
+                
+                # Verify R installation
+                if os.path.exists(r_home):
+                    print(f"R installation found at: {r_home}")
+                else:
+                    print(f"Warning: R installation not found at: {r_home}")
+            else:
+                print("No RPath specified in config.json")
+        else:
+            print(f"Config file not found at: {config_path}")
+            print("Using default R environment settings")
+            
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        print("Proceeding with default R environment settings")
+
+# Load config and setup R environment before importing rpy2
+load_config_and_setup_r()
 
 # R integration imports for rpy2 2.9.4
+R_AVAILABLE = False
 try:
+    # First check if R_HOME is set and valid
+    import os
+    r_home = os.environ.get('R_HOME')
+    if r_home and os.path.exists(r_home):
+        print(f"Found R_HOME: {r_home}")
+    else:
+        print("R_HOME not set or invalid")
+        raise ImportError("R_HOME not configured")
+    
     import rpy2.robjects as robjects
     from rpy2.robjects import pandas2ri, numpy2ri
     from rpy2.robjects.packages import importr
-    from rpy2.robjects.conversion import localconverter
-    import rpy2.rinterface as ri  # For rpy2 2.9.4
-    R_AVAILABLE = True
+    # RPY2 3.x uses context managers for conversion
+    # from rpy2.robjects.conversion import localconverter
+    # from rpy2.rinterface_lib.callbacks import logger as rpy2_logger
     
-    # Enable automatic conversion between pandas and R
+    import rpy2.rinterface as rinterface
+    
+    # Test basic R functionality
+    test_r = robjects.r('R.version.string')
+    print(f"R version: {test_r[0]}")
+    
+    # RPY2 3.x Use modern converter context instead of deprecated activate()
+    # pandas2ri_converter = pandas2ri.converter
+    # numpy2ri_converter = numpy2ri.converter
+    
+    # Suppress R warnings in console (for rpy2 3.x)
+    # rpy2_logger.setLevel(50)  # Only show critical errors
+
+    # RPY2 2.9.4  to activate converters
+    # Activate automatic conversion between pandas/numpy and R
     pandas2ri.activate()
     numpy2ri.activate()
-    
-    # Suppress R warnings in console (for rpy2 2.9.4)
-    ri.set_writeconsole_warnerror(lambda x: None)
+
+
+    R_AVAILABLE = True
+    print("R support enabled successfully with rpy2 2.9.4")
     
 except ImportError as e:
-    R_AVAILABLE = False
-    print("R support not available. Install rpy2 to enable R functionality:")
-    print(f"Import error: {e}")
+    print("R support not available due to import error:")
+    print(f"Error: {e}")
+    print("Please ensure R is properly installed and rpy2 is compatible")
+except Exception as e:
+    print("R support not available due to configuration error:")
+    print(f"Error: {e}")
+    print("Please check R installation and environment variables")
     
 
 # -----------------------------------------------------------------------------
@@ -820,6 +906,10 @@ def execute_r_code(code, timeout=30):
             try:
                 # Execute the entire code block at once
                 r_result = robjects.r(cleaned_code)
+                # In rpy2 3.x, we can use robjects.r() directly with string
+                # Use modern converter context instead of deprecated activate/deactivate
+                #with localconverter(robjects.default_converter + pandas2ri_converter + numpy2ri_converter):
+                #    r_result = robjects.r(cleaned_code)
                 
                 # Log successful execution
                 safe_log("R code executed successfully", 'info')
@@ -841,11 +931,13 @@ def execute_r_code(code, timeout=30):
                 error_msg = f"Error executing R code: {str(exec_error)}"
                 safe_log(error_msg, 'error')
                 result['success'] = False
+                result['error'] = error_msg
             
         except Exception as e:
             error_msg = f"R execution error: {str(e)}"
             safe_log(error_msg, 'error')
             result['success'] = False
+            result['error'] = error_msg
             
         finally:
             # Restore original stdout/stderr
@@ -854,7 +946,8 @@ def execute_r_code(code, timeout=30):
             
             # Get captured output
             result['output'] = stdout_capture.get_output()
-            result['error'] = stderr_capture.get_output()
+            if not result['error']:  # Only overwrite error if not already set
+                result['error'] = stderr_capture.get_output()
             
             # Log the captured output
             if result['output']:
@@ -906,56 +999,43 @@ def handle_matplotlib_plots():
     
     return {'has_plot': False}
 
+# Alternative simplified R plot checking function
+def check_for_r_plots():
+    """Simple check to see if R has created any plots"""
+    try:
+        if not R_AVAILABLE:
+            return False
+            
+        # Check if there are graphics devices with plots
+        #with localconverter(robjects.default_converter):
+        r_result = robjects.r('length(dev.list())')
+        return r_result[0] > 0
+        
+    except Exception:
+        return False
 
 def handle_r_plots():
-    """Handle R plots by saving them (compatible with rpy2 2.9.4)"""
+    """Handle R plots by saving them (compatible with rpy2 3.6.2)"""
     try:
         if not R_AVAILABLE:
             return {'has_plot': False}
             
-        # Temporarily disable logging for R operations
-        logging.getLogger().disabled = True
         # Check if there are any open R graphics devices
         try:
             # Check if there are any open R graphics devices
-            r_check = robjects.r('length(dev.list())')
-            safe_print(f"Number of R devices: {r_check[0]}")
+            # with localconverter(robjects.default_converter):
+                r_check = robjects.r('length(dev.list())')
+                safe_print(f"Number of R devices: {r_check[0]}")
 
-            if r_check[0] > 0:
-                plot_filename = f"r_plot_{uuid.uuid4().hex[:8]}.png"
-                plot_path = os.path.join(save_folder, plot_filename)
-                safe_print(f"Attempting to save R plot to: {plot_path}")
+                if r_check[0] > 0:
+                    plot_filename = f"r_plot_{uuid.uuid4().hex[:8]}.png"
+                    plot_path = os.path.join(save_folder, plot_filename)
+                    safe_print(f"Attempting to save R plot to: {plot_path}")
 
-                # Method 1: Try dev.print() - more reliable for existing plots
-                try:
-                    robjects.r(f'dev.print(png, "{plot_path.replace(chr(92), "/")}", width=800, height=600)')
-                    safe_print("Used dev.print() method")
-                    
-                    # Check if file was created and has content
-                    if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
-                        return {
-                            'has_plot': True,
-                            'plot_path': plot_path
-                        }
-                        
-                except Exception as e1:
-                    safe_print_error(f"dev.print() failed: {e1}")
-                    
-                    # Method 2: Try recordPlot and replayPlot approach
+                    # Method 1: Try dev.print() - more reliable for existing plots
                     try:
-                        # Record the current plot
-                        robjects.r('recorded_plot <- recordPlot()')
-                        
-                        # Open PNG device
-                        robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
-                        
-                        # Replay the plot
-                        robjects.r('replayPlot(recorded_plot)')
-                        
-                        # Close the device
-                        robjects.r('dev.off()')
-                        
-                        safe_print("Used recordPlot/replayPlot method")
+                        robjects.r(f'dev.print(png, "{plot_path.replace(chr(92), "/")}", width=800, height=600)')
+                        safe_print("Used dev.print() method")
                         
                         # Check if file was created and has content
                         if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
@@ -964,26 +1044,24 @@ def handle_r_plots():
                                 'plot_path': plot_path
                             }
                             
-                    except Exception as e2:
-                        safe_print_error(f"recordPlot/replayPlot failed: {e2}")
+                    except Exception as e1:
+                        safe_print_error(f"dev.print() failed: {e1}")
                         
-                        # Method 3: Alternative approach using dev.copy
+                        # Method 2: Try recordPlot and replayPlot approach
                         try:
-                            # Open a new PNG device
-                            png_dev = robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
+                            # Record the current plot
+                            robjects.r('recorded_plot <- recordPlot()')
                             
-                            # Get current device
-                            current_dev = robjects.r('dev.cur()')[0]
-                            safe_print(f"Current device: {current_dev}")
+                            # Open PNG device
+                            robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
                             
-                            if current_dev > 1:  # Device 1 is null device
-                                # Copy from current device to PNG
-                                robjects.r('dev.copy(which = dev.cur())')
-                                
-                            # Close the PNG device
+                            # Replay the plot
+                            robjects.r('replayPlot(recorded_plot)')
+                            
+                            # Close the device
                             robjects.r('dev.off()')
                             
-                            safe_print("Used alternative dev.copy method")
+                            safe_print("Used recordPlot/replayPlot method")
                             
                             # Check if file was created and has content
                             if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
@@ -992,28 +1070,49 @@ def handle_r_plots():
                                     'plot_path': plot_path
                                 }
                                 
-                        except Exception as e3:
-                            safe_print_error(f"Alternative dev.copy failed: {e3}")
-                
-                # If all methods failed, clean up empty file
-                if os.path.exists(plot_path) and os.path.getsize(plot_path) == 0:
-                    os.remove(plot_path)
-                    safe_print_error("Removed empty plot file")
+                        except Exception as e2:
+                            safe_print_error(f"recordPlot/replayPlot failed: {e2}")
+                            
+                            # Method 3: Alternative approach using dev.copy
+                            try:
+                                # Open a new PNG device
+                                png_dev = robjects.r('png')(plot_path.replace(chr(92), "/"), width=800, height=600, res=150)
+                                
+                                # Get current device
+                                current_dev = robjects.r('dev.cur()')[0]
+                                safe_print(f"Current device: {current_dev}")
+                                
+                                if current_dev > 1:  # Device 1 is null device
+                                    # Copy from current device to PNG
+                                    robjects.r('dev.copy(which = dev.cur())')
+                                    
+                                # Close the PNG device
+                                robjects.r('dev.off()')
+                                
+                                safe_print("Used alternative dev.copy method")
+                                
+                                # Check if file was created and has content
+                                if os.path.exists(plot_path) and os.path.getsize(plot_path) > 0:
+                                    return {
+                                        'has_plot': True,
+                                        'plot_path': plot_path
+                                    }
+                                    
+                            except Exception as e3:
+                                safe_print_error(f"Alternative dev.copy failed: {e3}")
                     
+                    # If all methods failed, clean up empty file
+                    if os.path.exists(plot_path) and os.path.getsize(plot_path) == 0:
+                        os.remove(plot_path)
+                        safe_print_error("Removed empty plot file")
+                        
         except Exception as plot_error:
             safe_print_error(f"R plot handling error: {plot_error}")
-            
-        finally:
-            # Re-enable logging
-            logging.getLogger().disabled = False
-            
+                
     except Exception as e:
         safe_print_error(f"Error in R plot handling: {str(e)}")
-        # Re-enable logging in case of error
-        logging.getLogger().disabled = False
     
     return {'has_plot': False}
-
 
 def get_data_source_by_name_from_db(name):
     """
@@ -1023,7 +1122,7 @@ def get_data_source_by_name_from_db(name):
         with sqlite3.connect(DATABASE_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT Name, DataURL, ResourceURL, IsRealtime, CreatedDate, LastUpdated 
+                SELECT Name, DataURL, ResourceURL, Apptoken, IsRealtime, CreatedDate, LastUpdated 
                 FROM DataSources 
                 WHERE Name = ? COLLATE NOCASE
             ''', (name,))
@@ -1034,9 +1133,10 @@ def get_data_source_by_name_from_db(name):
                     'name': row[0],
                     'data_url': row[1] if row[1] else "",
                     'resource_url': row[2] if row[2] else "",
-                    'is_realtime': bool(row[3]),
-                    'created_date': row[4] if row[4] else "",
-                    'last_updated': row[5] if row[5] else ""
+                    'app_token': row[3] if row[3] else "",
+                    'is_realtime': bool(row[4]),
+                    'created_date': row[5] if row[5] else "",
+                    'last_updated': row[6] if row[6] else ""
                 }
             return None
             
@@ -1454,17 +1554,17 @@ def process_json():
     """
     API endpoint to process incoming JSON data over HTTPS from localhost.
     """
-    # 1. 检查是否来自 localhost
+    # 1. check if localhost
     if request.remote_addr != '127.0.0.1':
         safe_log(f"Rejected request from non-localhost: {request.remote_addr}")
         abort(403, description="Only localhost requests are allowed.")
 
-    # 2. 检查 Content-Type
+    # 2. check Content-Type
     if not request.is_json:
         safe_log(f"Invalid Content-Type: {request.content_type}")
         abort(400, description="Content-Type must be application/json.")
 
-    # 3. 尝试获取 JSON 数据
+    # 3. get JSON data
     try:
         received_data = request.get_json()
         safe_log(f"Received JSON data: {received_data}")
@@ -1475,42 +1575,43 @@ def process_json():
         safe_log(f"Error parsing JSON: {e}")
         abort(400, description=f"Invalid JSON: {e}")
 
-    # 4. 检查 graph 字段
+    # 4. check graph key
     if "graph" not in received_data:
         abort(400, description="Missing required field: 'graph'")
 
   
 
-    # 5. 提取参数（带默认值）
+    # 5. read Parameters（with default values）
     try:
         graph = received_data["graph"]
         safe_log(f"Graph type: {graph}")
-        model = graph.get("Model", "farrington")
-        datasource = graph.get("DataSource", "Covid-19 Deaths")
-        title = graph.get("Title", "Farrington Outbreak Detection Simulation")
-        yearback = int(graph.get("YearBack", 3))
-        useTrainSplit = graph.get("UseTrainSplit", False)
-        threshold = int(graph.get("Threshold", 1500))
-        trainSplitRatio = float(graph.get("TrainSplitRatio", 0.70))
+        model = graph.get("model", "farrington")
+        datasource = graph.get("dataSource", "Covid-19 Deaths")
+        title = graph.get("title", "Farrington Outbreak Detection Simulation")
+        yearback = int(graph.get("yearBack", 3))
+        useTrainSplit = graph.get("useTrainSplit", False)
+        threshold = int(graph.get("threshold", 1500))
+        trainSplitRatio = float(graph.get("trainSplitRatio", 0.70))
         train_end_date = datetime(2024, 12, 31)
 
-        safe_log(f"Model: {model}, DataSource: {datasource}, Title: {title}, YearBack: {yearback}, \
-                UseTrainSplit: {useTrainSplit}, Threshold: {threshold}, TrainSplitRatio: {trainSplitRatio}")
+        safe_log(f"model: {model}, dataSource: {datasource}, title: {title}, yearBack: {yearback}, \
+                useTrainSplit: {useTrainSplit}, threshold: {threshold}, trainSplitRatio: {trainSplitRatio}")
 
         if not useTrainSplit:
-            train_end_date = pd.to_datetime(graph.get("TrainEndDate"))
+            train_end_date = pd.to_datetime(graph.get("trainEndDate"))
            
-            safe_log(f"Using TrainEndDate: {train_end_date}")
+            safe_log(f"Using trainEndDate: {train_end_date}")
 
     except Exception as e:
         safe_log(f"Parameter error: {e}")
         abort(400, description=f"Invalid parameters: {e}")
 
+
     import uuid
 
     unique_id = uuid.uuid4().hex[:8]
 
-    # 6. 生成图像路径
+    # 6. generate unique output plot path
     output_plot_path = (f"farrington_plot_{unique_id}.png")
     safe_log(f"Output plot path: {output_plot_path}")
 
@@ -1721,19 +1822,6 @@ def process_json():
     return jsonify(response_data), 200
 
 
-# Alternative simplified R plot checking function
-def check_for_r_plots():
-    """Simple check to see if R has created any plots"""
-    try:
-        if not R_AVAILABLE:
-            return False
-            
-        # Check if there are graphics devices with plots
-        r_result = robjects.r('length(dev.list())')
-        return r_result[0] > 0
-        
-    except Exception:
-        return False
 
 # New route for code execution
 @app.route('/execute', methods=['POST'])
@@ -2150,11 +2238,42 @@ def add_variable():
             'datasource': datasource
         }), 500
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for monitoring the server status.
+    Returns a simple JSON response.
+    """
+    print("Health check requested")
+    return jsonify({
+        "status": "ok",
+        "message": "epyflaServer is running",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }), 200
+
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
-    os._exit(0)  # Forcefully exit the Flask process
-    return 'Server shutting down...'
+    """
+    Gracefully shut down the Flask development server.
+    This should only be used in controlled environments (not production).
+    """
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        return jsonify({
+            "status": "error",
+            "message": "Not running with the Werkzeug Server"
+        }), 500
+
+    # 返回响应后再调用关闭函数
+    response = jsonify({
+        "status": "ok",
+        "message": "Server is shutting down",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
+
+    func()
+    return response
 
 @app.errorhandler(400)
 def bad_request(error):
@@ -2204,7 +2323,7 @@ if __name__ == '__main__':
          # Run the app:
          # host='127.0.0.1' ensures it only listens on the loopback interface.
          # ssl_context enables HTTPS.
-         app.run(host='127.0.0.1', port=PORT, debug=True)
+         app.run(host='127.0.0.1', port=PORT, debug=True, use_reloader=False)
     except ImportError:
          safe_log("Error: 'cryptography' library not found.")
          safe_log("Please install it for ad-hoc SSL certificate generation:")

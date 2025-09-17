@@ -1,0 +1,15 @@
+{
+  "pythonPath": "C:\\Users\\taohe\\miniconda3\\envs\\epysurv-dev\\python.exe",
+  "RPath": "C:\\Users\\taohe\\miniconda3\\envs\\epysurv-dev\\Lib\\R",
+  "serverPath": "epyflaServer.py",
+  "logPath": "",
+  "activateCommand": "C:\\Users\\taohe\\miniconda3\\envs\\epysurv-dev\\Scripts\\activate.bat",
+  "envName": "epysurv-dev",
+  "host": "smtp.gmail.com",
+  "port": 587,
+  "enableSsl": true,
+  "username": "tao.he.2008@gmail.com",
+  "password": "qpbxgapqbyowaacz",
+  "from": "tao.he.2008@gmail.com",
+  "fromDisplay": "ForeSITE Alerting Report"
+}

@@ -10,11 +10,17 @@ using Microsoft.Data.Sqlite;
 using Microsoft.VisualBasic;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
-using PdfSharp.Drawing;
-using PdfSharp.Fonts;
-using PdfSharp.Pdf;
+//using PdfSharp.Drawing;
+//using PdfSharp.Fonts;
+//using PdfSharp.Pdf;
+// 移除：using PdfSharp.*; 以及 GlobalFontSettings.FontResolver 等相关
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -23,6 +29,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -50,11 +57,15 @@ namespace ForeSITETestApp
             _httpClient = window.getHttpClient();
             _reportElements = new List<ReportElement>(); // Initialize report elements list
             InitializeDataSources();
-            
+
+            ObservableCollection<SchedulerTask> schedulers = DBHelper.GetAllSchedulers();
+            SchedulerTable.ItemsSource = schedulers;
+
+
             // Initialize default FlowDocument
             _titleDocument = new FlowDocument(new Paragraph(new Run("Click to edit title")));
             // Set custom font resolver
-            GlobalFontSettings.FontResolver = new CustomFontResolver();
+            //GlobalFontSettings.FontResolver = new CustomFontResolver();
             DrawingCanvas.Height = 300; // Minimum height for placeholder
             CheckAndManagePlaceholder();
 
@@ -106,6 +117,7 @@ namespace ForeSITETestApp
             SchedulerGrid.Visibility = Visibility.Visible;
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
+            ModelGrid.Visibility = Visibility.Collapsed;
         }
 
         // Helper method to refresh just the data source count
@@ -138,7 +150,7 @@ namespace ForeSITETestApp
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
-
+            ModelGrid.Visibility = Visibility.Collapsed;
             RefreshDataSourceCount();
         }
 
@@ -165,6 +177,7 @@ namespace ForeSITETestApp
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Visible;
             DataSourceGrid.Visibility = Visibility.Collapsed;
+            ModelGrid.Visibility = Visibility.Collapsed;
         }
 
         private void DataSourceButton_Click(object sender, RoutedEventArgs e)
@@ -174,6 +187,17 @@ namespace ForeSITETestApp
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Visible;
+            ModelGrid.Visibility = Visibility.Collapsed;
+        }
+
+        private void ModelButton_Click(object sender, RoutedEventArgs e)
+        {
+            HeaderTitle.Text = "Model Management";
+            DefaultContentGrid.Visibility = Visibility.Collapsed;
+            SchedulerGrid.Visibility = Visibility.Collapsed;
+            ReportsGrid.Visibility = Visibility.Collapsed;
+            DataSourceGrid.Visibility = Visibility.Collapsed;
+            ModelGrid.Visibility = Visibility.Visible;
         }
 
         private async void LoadDataButton_Click(object sender, RoutedEventArgs e)
@@ -214,7 +238,7 @@ namespace ForeSITETestApp
                         Foreground = Brushes.Gray,
                         FontSize = 14,
                         TextAlignment = TextAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center
+                        VerticalAlignment = System.Windows.VerticalAlignment.Center
                     };
                     // Center the placeholder (adjust based on canvas size)
                     Canvas.SetLeft(_placeholderTextBlock, (DrawingCanvas.ActualWidth - _placeholderTextBlock.ActualWidth) / 2);
@@ -241,14 +265,15 @@ namespace ForeSITETestApp
         }
 
         // Helper method to add new data source to database
-        private bool AddDataSourceToDatabase(string name, string dataUrl, string resourceUrl, bool isRealtime)
+        private bool AddDataSourceToDatabase(string name, string dataUrl, string resourceUrl, string appToken, bool isRealtime)
         {
            return DBHelper.InsertDataSource(new DataSource
             {
                 Name = name,
                 DataURL = dataUrl,
                 ResourceURL = resourceUrl,
-                IsRealtime = isRealtime
+                AppToken = appToken,
+               IsRealtime = isRealtime
             });
             
         }
@@ -272,6 +297,7 @@ namespace ForeSITETestApp
                             Name = dataSource.Name,
                             DataURL = dataSource.DataURL,
                             ResourceURL = dataSource.ResourceURL,
+                            AppToken = dataSource.AppToken,
                             IsRealtime = dataSource.IsRealtime,
                             IsSelected = false
                         });
@@ -341,7 +367,7 @@ namespace ForeSITETestApp
                 Name = "RealtimeRadio",
                 IsChecked = true,
                 Margin = new Thickness(0, 0, 20, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
             };
 
             var staticRadio = new RadioButton
@@ -349,7 +375,7 @@ namespace ForeSITETestApp
                 Content = "Local Data (CSV File)",
                 Name = "StaticRadio",
                 Margin = new Thickness(0, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
             };
 
             realtimePanel.Children.Add(realtimeRadio);
@@ -399,6 +425,24 @@ namespace ForeSITETestApp
             };
             realtimeFieldsPanel.Children.Add(resourceUrlInput);
 
+            realtimeFieldsPanel.Children.Add(new TextBlock
+            {
+                Text = "App Token",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 0, 0, 5)
+            });
+
+            var appTokenInput = new TextBox
+            {
+                Name = "AppTokenInput",
+                Width = 400,
+                Height = 25,
+                Margin = new Thickness(0, 0, 0, 10),
+                ToolTip = "Enter the app token (e.g., app ID)"
+            };
+            realtimeFieldsPanel.Children.Add(appTokenInput);
+
             mainStackPanel.Children.Add(realtimeFieldsPanel);
 
             // Static Data Fields (initially hidden)
@@ -432,7 +476,7 @@ namespace ForeSITETestApp
                 Background = Brushes.LightGray,
                 BorderBrush = Brushes.Gray,
                 BorderThickness = new Thickness(1),
-                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
                 Padding = new Thickness(5, 0, 5, 0)
             };
 
@@ -485,7 +529,7 @@ namespace ForeSITETestApp
             var buttonPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
                 Margin = new Thickness(0, 20, 0, 0)
             };
 
@@ -529,6 +573,7 @@ namespace ForeSITETestApp
                     bool isRealtime = realtimeRadio.IsChecked == true;
                     string dataUrl = "";
                     string resourceUrl = "";
+                    string appToken = "";
 
                     if (isRealtime)
                     {
@@ -549,13 +594,23 @@ namespace ForeSITETestApp
                             return;
                         }
 
+                        if (string.IsNullOrWhiteSpace(appTokenInput.Text))
+                        {
+                            MessageBox.Show("App Token is required for real-time data sources.", "Validation Error",
+                                          MessageBoxButton.OK, MessageBoxImage.Warning);
+                            appTokenInput.Focus();
+                            return;
+                        }
+
                         dataUrl = dataUrlInput.Text.Trim();
                         resourceUrl = resourceUrlInput.Text.Trim();
+                        appToken=appTokenInput.Text.Trim();
+
                     }
                     else
                     {
                         // Validate static file field
-                        string filePath = filePathLabel.Content?.ToString();
+                        string? filePath = filePathLabel.Content?.ToString();
                         if (string.IsNullOrEmpty(filePath) || filePath == "No file selected")
                         {
                             MessageBox.Show("Please select a CSV file for static data sources.", "Validation Error",
@@ -575,7 +630,7 @@ namespace ForeSITETestApp
                     }
 
                     // Check for duplicate names in memory collection
-                    if (_dataSources != null && _dataSources.Any(ds => ds.Name.Equals(nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    if (_dataSources != null && _dataSources.Any(predicate: ds => ds.Name.Equals(nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                     {
                         var result = MessageBox.Show(
                             $"A data source with the name '{nameInput.Text.Trim()}' already exists.\nDo you want to overwrite it?",
@@ -594,6 +649,7 @@ namespace ForeSITETestApp
                         nameInput.Text.Trim(),
                         dataUrl,
                         resourceUrl,
+                        appToken,
                         isRealtime);
 
                     if (success)
@@ -674,7 +730,297 @@ namespace ForeSITETestApp
 
         private void SchedulingButton_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("TODO: Scheduling function soon ^_^", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            try
+            {
+                if (_reportElements == null || _reportElements.Count == 0)
+                {
+                    MessageBox.Show("No content on the canvas to export as a template.",
+                                    "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 选择保存路径
+                var sfd = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "JSON Template (*.json)|*.json",
+                    DefaultExt = "json",
+                    FileName = "report_template.json"
+                };
+                if (sfd.ShowDialog() != true)
+                    return;
+
+                // 根对象
+                var root = new JObject
+                {
+                    ["templateVersion"] = "1.0",
+                    ["createdAt"] = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    ["app"] = "ForeSITETestApp",
+                    ["canvas"] = new JObject
+                    {
+                        ["width"] = Math.Max(DrawingCanvas.ActualWidth, 778),
+                        ["height"] = DrawingCanvas.ActualHeight
+                    }
+                };
+
+                var layout = new JArray();
+
+                foreach (var re in _reportElements)
+                {
+                    if (re.Element is not Border border) continue;
+
+                    // Title
+                    if (re.Type == ReportElementType.Title)
+                    {
+                        // 优先 _titleDocument；否则从 UI 获取 TextBlock / RichTextBox 文档
+                        FlowDocument? titleDoc = _titleDocument ?? TryGetTitleFlowDoc(border);
+                        string flowXaml = FlowDocToXaml(titleDoc);
+                        string text = FlowDocToPlainText(titleDoc);
+
+                        var titleJson = new JObject
+                        {
+                            ["type"] = "Title",
+                            ["content"] = new JObject
+                            {
+                                ["flowXaml"] = flowXaml,
+                                ["text"] = text
+                            }
+                        };
+                        layout.Add(titleJson);
+                    }
+                    // Plot
+                    else if (re.Type == ReportElementType.Plot)
+                    {
+                        // 从 Tag 里抽取参数（推荐在创建 plot 时把 graph 写入 Tag）
+                        var param = ExtractPlotParamsFromTag(border?.Tag);
+
+                        var plotJson = new JObject
+                        {
+                            ["type"] = "Plot",
+                            ["params"] = param // 只含关键字段；其余没有则不会出现
+                        };
+                        layout.Add(plotJson);
+                    }
+                    // Comment
+                    else if (re.Type == ReportElementType.Comment)
+                    {
+                        // 我们前面设计：CommentMeta 存在于 border.Tag.Document
+                        FlowDocument? doc = null;
+
+                        if (border.Tag is CommentMeta meta && meta.Document != null)
+                            doc = meta.Document;
+                        else
+                            doc = (border.Child as Grid)?
+                                  .Children.OfType<RichTextBox>().FirstOrDefault()?.Document;
+
+                        string flowXaml = FlowDocToXaml(doc);
+                        string text = FlowDocToPlainText(doc);
+
+                        var commentJson = new JObject
+                        {
+                            ["type"] = "Comment",
+                            ["content"] = new JObject
+                            {
+                                ["flowXaml"] = flowXaml,
+                                ["text"] = text
+                            }
+                        };
+                        layout.Add(commentJson);
+                    }
+                }
+
+                // 附加调度占位（你的 schedule app 可在运行时替换）
+                root["layout"] = layout;
+
+                // 默认值
+                string scheduleStart = "";
+                string scheduleFreq = "";
+
+                // 从第一个 Plot 的 Tag 里取 beginDate 和 freq
+                var firstPlot = _reportElements.FirstOrDefault(e => e.Type == ReportElementType.Plot);
+                if (firstPlot?.Element is Border b && b.Tag is JObject tag && tag["graph"] is JObject g)
+                {
+                    scheduleStart = g["BeginDate"]?.ToString() ?? "";
+                    scheduleFreq = g["Freq"]?.ToString() ?? "";
+                }
+
+                // 写入 schedule 部分
+                root["schedule"] = new JObject
+                {
+                    ["startDate"] = scheduleStart,   // e.g. "2025-09-12"
+                    ["frequency"] = scheduleFreq,    // e.g. "By Week"
+                    ["cron"] = ""
+                };
+
+
+                File.WriteAllText(sfd.FileName, root.ToString(Newtonsoft.Json.Formatting.Indented));
+
+                // ========== 2) 写入 scheduler 表 ==========
+                // 收件人（若你 XAML 用的是 x:Name="RecipientEmailsBox"）
+                string recipients = "";
+                if (this.FindName("RecipientEmailsBox") is TextBox recipientBox && !string.IsNullOrWhiteSpace(recipientBox.Text))
+                {
+                    // 允许用户每行一个邮箱；这里存为逗号分隔
+                    var lines = recipientBox.Text
+                        .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => x.Trim())
+                        .Where(x => x.Length > 0);
+                    recipients = string.Join(",", lines);
+                }
+
+                var task = new SchedulerTask
+                {
+                    Recipients = recipients,          // 可为空
+                    AttachmentPath = sfd.FileName,        // 模板/附件路径（全路径）
+                    StartDate = scheduleStart ?? "", // "YYYY-MM-DD"
+                    Freq = scheduleFreq ?? ""  // "By Week"/"daily"/"weekly"/...
+                };
+
+                bool ok = DBHelper.InsertScheduler(task);
+                if (ok)
+                {
+                    RefreshSchedulerUI();
+
+
+                    MessageBox.Show("Template saved and scheduler record inserted.",
+                                    "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("Template saved, but failed to insert scheduler record.",
+                                    "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error creating template: {ex.Message}", "Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // refresh Scheduler DataGrid 
+        private void RefreshSchedulerUI()
+        {
+            // 重新取库里最新数据
+            var latest = DBHelper.GetAllSchedulers(); // ObservableCollection<SchedulerTask>
+
+            if (SchedulerTable.ItemsSource is ObservableCollection<SchedulerTask> current)
+            {
+                current.Clear();
+                foreach (var item in latest)
+                    current.Add(item);       // 保持同一个集合实例，避免绑定丢失
+            }
+            else
+            {
+                SchedulerTable.ItemsSource = latest;  // 首次绑定
+            }
+
+          
+        }
+
+
+        // 将 FlowDocument 序列化为 XAML 字符串；null -> ""
+        private static string FlowDocToXaml(FlowDocument? doc)
+        {
+            if (doc == null) return "";
+            try
+            {
+                string xaml = XamlWriter.Save(doc);
+                return xaml ?? "";
+            }
+            catch { return ""; }
+        }
+
+        // 提取 FlowDocument 的纯文本（Run 拼接）
+        private static string FlowDocToPlainText(FlowDocument? doc)
+        {
+            if (doc == null) return "";
+            try
+            {
+                var range = new TextRange(doc.ContentStart, doc.ContentEnd);
+                return (range.Text ?? "").TrimEnd('\r', '\n');
+            }
+            catch { return ""; }
+        }
+
+        // 从 Tag（通常是 JObject graph 或含 graph 的容器）抽取关键 Plot 参数
+        private static JObject ExtractPlotParamsFromTag(object? tag)
+        {
+            // 目标：只保留 title / model / yearBack / trainSplitRatio（如存在）
+            // 如果你在 Tag 里保存的是： new JObject { ["graph"] = graphData, ["title"]=..., ... }
+            // 下面会优先从 tag["graph"] 读取；否则尝试直接从 tag 读取。
+
+            string? title = null;
+            string? model = null;
+            string? yearBack = null;
+            string? trainSplitRatio = null;
+
+            string? dataSource = null;
+            string? beginDate = null;
+            string? freq = null;
+            string? threshold = null;
+            string? useTrainSplit = null;
+            string? trainEndDate = null;
+
+            static string? S(JToken? token) => token?.ToString();
+
+            try
+            {
+                if (tag is JObject jtag)
+                {
+                    // 可能存在 graph
+                    var g = jtag["graph"] as JObject ?? jtag;
+
+                    title = S(jtag["title"]) ?? S(g["Title"]);
+                    model = S(g["Model"]);
+                    yearBack = S(g["YearBack"]) ?? S(g["years_back"]);
+                    trainSplitRatio = S(g["TrainSplitRatio"]);
+
+                    // 可选的其它字段（有则带上，便于将来扩展）
+                    dataSource = S(g["DataSource"]);
+                    beginDate = S(g["BeginDate"]);
+                    freq = S(g["Freq"]);
+                    threshold = S(g["Threshold"]);
+                    useTrainSplit = S(g["UseTrainSplit"]);
+                    trainEndDate = S(g["TrainEndDate"]);
+                }
+            }
+            catch { /* 忽略解析异常 */ }
+
+            var o = new JObject();
+
+            // 只输出你指定的关键字段
+            if (!string.IsNullOrEmpty(title)) o["title"] = title;
+            if (!string.IsNullOrEmpty(model)) o["model"] = model;
+            if (!string.IsNullOrEmpty(yearBack)) o["yearBack"] = yearBack;
+            if (!string.IsNullOrEmpty(trainSplitRatio)) o["trainSplitRatio"] = trainSplitRatio;
+
+            // 下面这些“可选字段”若存在，就一起带上；否则省略
+            if (!string.IsNullOrEmpty(dataSource)) o["dataSource"] = dataSource;
+            if (!string.IsNullOrEmpty(beginDate)) o["beginDate"] = beginDate;
+            if (!string.IsNullOrEmpty(freq)) o["freq"] = freq;
+            if (!string.IsNullOrEmpty(threshold)) o["threshold"] = threshold;
+            if (!string.IsNullOrEmpty(useTrainSplit)) o["useTrainSplit"] = useTrainSplit;
+            if (!string.IsNullOrEmpty(trainEndDate)) o["trainEndDate"] = trainEndDate;
+
+            return o;
+        }
+
+        // 从 Title Border 提取 FlowDocument（当 _titleDocument 为空时的兜底）
+        private static FlowDocument? TryGetTitleFlowDoc(Border titleBorder)
+        {
+            if (titleBorder?.Child is Grid g)
+            {
+                var rtb = g.Children.OfType<RichTextBox>().FirstOrDefault();
+                if (rtb?.Document != null) return rtb.Document;
+
+                var tb = g.Children.OfType<TextBlock>().FirstOrDefault();
+                if (tb != null)
+                {
+                    var doc = new FlowDocument(new Paragraph(new Run(tb.Text ?? "")));
+                    return doc;
+                }
+            }
+            return null;
         }
 
 
@@ -719,7 +1065,7 @@ namespace ForeSITETestApp
                 Foreground = Brushes.Gray,
                 FontSize = 16,
                 TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
             };
 
             // Apply initial formatting from _titleDocument
@@ -757,8 +1103,8 @@ namespace ForeSITETestApp
                 BorderBrush = Brushes.Gray,
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(0),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
                 Cursor = Cursors.Hand
             };
 
@@ -836,7 +1182,7 @@ namespace ForeSITETestApp
                     TextBlock newTextBlock = new TextBlock
                     {
                         TextAlignment = TextAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center,
+                        VerticalAlignment = System.Windows.VerticalAlignment.Center,
                         FontSize = 16
                     };
 
@@ -913,7 +1259,7 @@ namespace ForeSITETestApp
                             TextBlock finalTextBlock = new TextBlock
                             {
                                 TextAlignment = TextAlignment.Center,
-                                VerticalAlignment = VerticalAlignment.Center,
+                                VerticalAlignment = System.Windows.VerticalAlignment.Center,
                                 FontSize = 16
                             };
 
@@ -992,7 +1338,8 @@ namespace ForeSITETestApp
             // Update report elements: replace or insert title
             if (_reportElements.Any() && _reportElements.First().Type == ReportElementType.Title)
             {
-                _reportElements[0] = new ReportElement { Type = ReportElementType.Title, Element = titleBorder };
+                 _reportElements[0] = new ReportElement { Type = ReportElementType.Title, Element = titleBorder };
+                
             }
             else
             {
@@ -1002,255 +1349,437 @@ namespace ForeSITETestApp
             // Redraw canvas
             RedrawCanvas();
             CheckAndManagePlaceholder();
+            UpdateCanvasHeight();
         }
 
-        private XFont GetSafeFont(string preferredFont, double size, XFontStyleEx style = XFontStyleEx.Regular)
+        // Save Comment richtext（put into Comment Border.Tag ）
+        private sealed class CommentMeta
         {
-            string[] fallbackFonts = { preferredFont, "Helvetica", "Times New Roman" };
-            foreach (var fontName in fallbackFonts)
-            {
-                try
-                {
-                    return new XFont(fontName, size, style);
-                }
-                catch
-                {
-                    // Continue to try the next font
-                }
-            }
-            // Ultimate fallback: use a generic font with default style
-            return new XFont("Helvetica", size, XFontStyleEx.Regular); // PdfSharpCore may handle this gracefully
+            public FlowDocument Document { get; set; } = new FlowDocument();
         }
+
+        // deep copy FlowDocument，avoid UI与存档引用同一个对象
+        private static FlowDocument CloneFlowDocument(FlowDocument source)
+        {
+            if (source == null) return new FlowDocument();
+            string xaml = XamlWriter.Save(source);
+            using var sr = new System.IO.StringReader(xaml);
+            using var xr = System.Xml.XmlReader.Create(sr);
+            return (FlowDocument)XamlReader.Load(xr);
+        }
+
+        private Border BuildCommentBorder(double canvasWidth)
+        {
+            var commentBorder = new Border
+            {
+                Background = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(5),
+                Width = canvasWidth * 0.9,
+                Height = 100
+            };
+
+            var grid = new Grid { Margin = new Thickness(0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // 初始文档（空段落），并立即存一个快照到 Tag
+            var initialParagraph = new Paragraph(new Run(""))
+            {
+                LineHeight = 16,                     // 每行高度
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                Margin = new Thickness(0, 2, 0, 2)   // 段落上下间距（上 2px，下 2px）
+            };
+
+            var initialDoc = new FlowDocument(initialParagraph)
+            {
+                PageWidth = commentBorder.Width - 60,  // 控制换行宽度，和 UI 一致
+            };
+
+            var rich = new RichTextBox
+            {
+                BorderThickness = new Thickness(0),
+                BorderBrush = Brushes.LightGray,
+                Padding = new Thickness(8),
+                AcceptsReturn = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MinHeight = 100,
+                Document = initialDoc
+                //Width = canvasWidth * 0.9 - 60 // 给按钮留点位置
+            };
+
+            // 动态高度
+            rich.TextChanged += (s, e) =>
+            {
+                rich.Document.PageWidth = commentBorder.Width - 60;
+                // 统一段落紧凑样式（用户在编辑器中新加段落也会套用）
+                foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
+                {
+                    p.LineHeight = 16;
+                    p.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+                    p.Margin = new Thickness(0, 2, 0, 2);
+                }
+                double contentHeight = rich.ExtentHeight + 20;
+                commentBorder.Height = Math.Max(160, contentHeight);
+                RedrawCanvas();
+                UpdateCanvasHeight();
+
+                // 更新 Tag 中的快照（便于导出 PDF 使用同一份 FlowDocument）
+                if (commentBorder.Tag is CommentMeta meta)
+                    meta.Document = CloneFlowDocument(rich.Document);
+            };
+
+            Grid.SetColumn(rich, 0);
+            Grid.SetRow(rich, 0);
+
+            // 在 Border.Tag 中保存评论的 FlowDocument 快照
+            commentBorder.Tag = new CommentMeta
+            {
+                Document = CloneFlowDocument(initialDoc)
+            };
+
+            var editButton = new Button
+            {
+                Content = "✎",
+                Width = 20,
+                Height = 20,
+                FontSize = 12,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(1),
+                //Margin = new Thickness(6, 0, 0, 0),
+                Padding = new Thickness(0),
+                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
+                Cursor = Cursors.Hand
+            };
+            // Style the button on hover
+            Style editorButtonStyle = new Style(typeof(Button));
+            editorButtonStyle.Setters.Add(new Setter { Property = Button.BackgroundProperty, Value = Brushes.Transparent });
+            editorButtonStyle.Triggers.Add(new Trigger
+            {
+                Property = Button.IsMouseOverProperty,
+                Value = true,
+                Setters = { new Setter { Property = Button.BackgroundProperty, Value = Brushes.LightGray } }
+            });
+            editButton.Style = editorButtonStyle;
+
+            editButton.Click += (s, args) =>
+            {
+                var editor = new RichTextEditorWindow(rich);
+                editor.Owner = Window.GetWindow(this);
+                editor.ShowDialog();
+
+                // 统一段落紧凑样式 & PageWidth
+                rich.Document.PageWidth = commentBorder.Width - 60;
+                foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
+                {
+                    p.LineHeight = 16;
+                    p.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+                    p.Margin = new Thickness(0, 2, 0, 2);
+                }
+
+
+                // 更新高度
+                commentBorder.Height = Math.Max(160, rich.ExtentHeight + 20);
+
+                // 更新 Tag 快照
+                if (commentBorder.Tag is CommentMeta meta)
+                    meta.Document = CloneFlowDocument(rich.Document);
+
+                RedrawCanvas();
+                UpdateCanvasHeight();
+            };
+
+            var deleteButton = new Button
+            {
+                Content = "x",
+                Width = 20,
+                Height = 20,
+                FontSize = 12,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Gray,
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(6, 0, 0, 0),
+                Padding = new Thickness(0),
+                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
+                Cursor = Cursors.Hand
+            };
+            // Style the button on hover
+            Style deleteButtonStyle = new Style(typeof(Button));
+            deleteButtonStyle.Setters.Add(new Setter { Property = Button.BackgroundProperty, Value = Brushes.Transparent });
+            deleteButtonStyle.Triggers.Add(new Trigger
+            {
+                Property = Button.IsMouseOverProperty,
+                Value = true,
+                Setters = { new Setter { Property = Button.BackgroundProperty, Value = Brushes.LightGray } }
+            });
+            deleteButton.Style = deleteButtonStyle;
+
+            deleteButton.Click += (s, args) =>
+            {
+                // 从 _reportElements 移除对应的元素，再重绘
+                _reportElements.RemoveAll(e => ReferenceEquals(e.Element, commentBorder));
+                RedrawCanvas();
+                CheckAndManagePlaceholder();
+                UpdateCanvasHeight();
+            };
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = System.Windows.VerticalAlignment.Top
+            };
+            buttonPanel.Children.Add(editButton);
+            buttonPanel.Children.Add(deleteButton);
+            Grid.SetColumn(buttonPanel, 1);
+            Grid.SetRow(buttonPanel, 0);
+
+            grid.Children.Add(rich);
+            grid.Children.Add(buttonPanel);
+
+            commentBorder.Child = grid;
+            return commentBorder;
+        }
+
+        private void AddCommentButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                double canvasWidth = Math.Max(DrawingCanvas.ActualWidth, 778);
+                var commentBorder = BuildCommentBorder(canvasWidth);
+
+                _reportElements.Add(new ReportElement
+                {
+                    Type = ReportElementType.Comment,
+                    Element = commentBorder
+                });
+
+                RedrawCanvas();
+                CheckAndManagePlaceholder();
+                UpdateCanvasHeight();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error adding comment: {ex.Message}", "Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
 
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                if (DrawingCanvas.Children.Count == 0 || _reportElements.Count == 0)
+                if (_reportElements == null || _reportElements.Count == 0)
                 {
-                    MessageBox.Show("Please add at least one report element before saving.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Please add at least one report element before saving.",
+                                    "Info", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
 
-                // Ensure title is in TextBlock state (not RichTextBox)  
-                var titleElement = _reportElements.FirstOrDefault(re => re.Type == ReportElementType.Title);
-                if (titleElement != null && titleElement.Element?.Child is Grid contentGrid) // Added null check for Element  
-                {
-                    var richTextBox = contentGrid.Children.OfType<RichTextBox>().FirstOrDefault();
-                    if (richTextBox != null)
-                    {
-                        // Store the current FlowDocument  
-                        _titleDocument = new FlowDocument();
-                        foreach (var block in richTextBox.Document.Blocks.ToList())
-                        {
-                            _titleDocument.Blocks.Add(block);
-                        }
-
-                        // Create new TextBlock with formatted text  
-                        TextBlock newTextBlock = new TextBlock
-                        {
-                            TextAlignment = TextAlignment.Center,
-                            VerticalAlignment = VerticalAlignment.Center,
-                            FontSize = 16
-                        };
-
-                        string plainText = new TextRange(richTextBox.Document.ContentStart, richTextBox.Document.ContentEnd).Text.Trim();
-                        if (string.IsNullOrEmpty(plainText))
-                        {
-                            plainText = "Click to edit title";
-                            newTextBlock.Foreground = Brushes.Gray;
-                        }
-                        else
-                        {
-                            newTextBlock.Foreground = Brushes.Black;
-                        }
-
-                        if (_titleDocument.Blocks.FirstBlock is Paragraph newParagraph)
-                        {
-                            newTextBlock.Inlines.Clear();
-                            foreach (var inline in newParagraph.Inlines)
-                            {
-                                if (inline is Run run)
-                                {
-                                    Run newRun = new Run(run.Text)
-                                    {
-                                        FontWeight = run.FontWeight,
-                                        FontStyle = run.FontStyle,
-                                        TextDecorations = run.TextDecorations,
-                                        FontSize = run.FontSize,
-                                        FontFamily = run.FontFamily
-                                    };
-                                    newTextBlock.Inlines.Add(newRun);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            newTextBlock.Text = plainText;
-                        }
-
-                        contentGrid.Children.Remove(richTextBox);
-                        Grid.SetColumn(newTextBlock, 0);
-                        Grid.SetRow(newTextBlock, 0);
-                        contentGrid.Children.Add(newTextBlock);
-
-                        // Close editor window if open  
-                        if (_editorWindow != null)
-                        {
-                            _editorWindow.Close();
-                            _editorWindow = null;
-                        }
-                    }
-                }
-
-                // Prompt user to save PDF  
-                SaveFileDialog saveFileDialog = new SaveFileDialog
+                // 选择保存路径
+                var dlg = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "PDF Files (*.pdf)|*.pdf",
                     DefaultExt = "pdf",
                     FileName = "Report.pdf"
                 };
+                if (dlg.ShowDialog() != true)
+                    return;
 
-                if (saveFileDialog.ShowDialog() == true)
-                {
-                    // Create a new PDF document  
-                    PdfDocument pdfDocument = new PdfDocument();
-                    PdfPage pdfPage = pdfDocument.AddPage();
-                    XGraphics gfx = XGraphics.FromPdfPage(pdfPage);
+                string filePath = dlg.FileName;
 
-                    // Set page size to A4 and calculate scaling to fit canvas  
-                    double a4Width = 595; // A4 width in points (72 DPI)  
-                    double a4Height = 842; // A4 height in points  
-                    double margin = 20;
-                    double canvasWidth = DrawingCanvas.ActualWidth;
-                    double canvasHeight = DrawingCanvas.ActualHeight;
+                // QuestPDF 许可（如有商业授权请替换）
+                QuestPDF.Settings.License = LicenseType.Community;
 
-                    // Calculate scaling to fit canvas within A4 with margins  
-                    double scaleX = (a4Width - 2 * margin) / canvasWidth;
-                    double scaleY = (a4Height - 2 * margin) / canvasHeight;
-                    double scale = Math.Min(scaleX, scaleY);
-                    double offsetX = (a4Width - canvasWidth * scale) / 2;
-                    double offsetY = (a4Height - canvasHeight * scale) / 2;
-
-                    // Apply scaling transform  
-                    gfx.TranslateTransform(offsetX, offsetY);
-                    gfx.ScaleTransform(scale, scale);
-
-                    // Draw canvas background  
-                    var bgColor = (DrawingCanvas.Background as SolidColorBrush)?.Color ?? Colors.White;
-                    gfx.DrawRectangle(new XSolidBrush(XColor.FromArgb(bgColor.A, bgColor.R, bgColor.G, bgColor.B)),
-                        0, 0, canvasWidth, canvasHeight);
-
-
-                    // Draw report elements
-                    foreach (var element in _reportElements)
+                Document
+                    .Create(c =>
                     {
-                        if (element.Element?.Child is Grid plotContentGrid)
+                        c.Page(page =>
                         {
-                            double borderLeft = Canvas.GetLeft(element.Element);
-                            double borderTop = Canvas.GetTop(element.Element);
-                            double borderWidth = element.Element.Width;
-                            double borderHeight = element.Element.Height;
+                            page.Size(PageSizes.A4);
+                            page.Margin(36);
+                            page.DefaultTextStyle(x => x.FontSize(11));
 
-                            // Draw border background
-                            var borderBgColor = (element.Element.Background as SolidColorBrush)?.Color ?? Colors.White;
-                            gfx.DrawRectangle(new XSolidBrush(XColor.FromArgb(borderBgColor.A, borderBgColor.R, borderBgColor.G, borderBgColor.B)),
-                                borderLeft, borderTop, borderWidth, borderHeight);
-
-                            if (element.Type == ReportElementType.Title)
+                            page.Content().Column(col =>
                             {
-                                // Draw title text
-                                var titleTextBlock = plotContentGrid.Children.OfType<TextBlock>().FirstOrDefault();
-                                if (titleTextBlock != null)
+                                // 按 _reportElements 的顺序输出
+                                foreach (var re in _reportElements)
                                 {
-                                    string text = new TextRange(titleTextBlock.ContentStart, titleTextBlock.ContentEnd).Text.Trim();
-                                    double textLeft = borderLeft + 5;
-                                    double textTop = borderTop + borderHeight / 2;
+                                    if (re.Element is not Border border || border.Child is not Grid grid)
+                                        continue;
 
-                                    if (titleTextBlock.Inlines.Any())
+                                    switch (re.Type)
                                     {
-                                        double currentX = textLeft;
-                                        foreach (var inline in titleTextBlock.Inlines)
-                                        {
-                                            if (inline is Run run)
+                                        case ReportElementType.Title:
                                             {
-                                                bool isBold = run.FontWeight == FontWeights.Bold;
-                                                bool isItalic = run.FontStyle == FontStyles.Italic;
-                                                string fontName = run.FontFamily?.ToString() ?? "Arial";
-                                                double fontSize = run.FontSize > 0 ? run.FontSize : 16;
+                                                // 优先使用 _titleDocument；否则从 TextBlock 退化为纯文本
+                                                FlowDocument titleDoc = _titleDocument
+                                                                ?? new FlowDocument(new Paragraph(new Run(
+                                                                    grid.Children.OfType<TextBlock>().FirstOrDefault()?.Text ?? "")));
 
-                                                XFont runFont = new XFont(fontName, fontSize,
-                                                    isBold ? XFontStyleEx.Bold : isItalic ? XFontStyleEx.Italic : XFontStyleEx.Regular);
-
-                                                gfx.DrawString(run.Text,
-                                                    runFont,
-                                                    new XSolidBrush(XColor.FromArgb(Colors.Black.A, Colors.Black.R, Colors.Black.G, Colors.Black.B)),
-                                                    currentX, textTop);
-                                                currentX += gfx.MeasureString(run.Text, runFont).Width;
+                                                col.Item()
+                                           .PaddingBottom(12)
+                                           .Text(t =>
+                                               {
+                                                   t.AlignCenter();
+                                                   AppendFlowDocToQuest(t, titleDoc);
+                                               });
+                                                break;
                                             }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        XFont defaultFont = new XFont("Arial", 16);
-                                        gfx.DrawString(text,
-                                            defaultFont,
-                                            new XSolidBrush(XColor.FromArgb(Colors.Black.A, Colors.Black.R, Colors.Black.G, Colors.Black.B)),
-                                            textLeft, textTop);
+
+                                        case ReportElementType.Plot:
+                                            {
+                                                var img = grid.Children.OfType<System.Windows.Controls.Image>().FirstOrDefault();
+                                                if (img?.Source is BitmapSource bmp)
+                                                {
+                                                    var bytes = WpfBitmapToPngBytes(bmp);
+                                                    if (bytes != null && bytes.Length > 0)
+                                                        col.Item().PaddingBottom(18).Image(bytes).FitWidth();
+                                                }
+                                                break;
+                                            }
+
+                                        case ReportElementType.Comment:
+                                            {
+                                                // 优先读取 Border.Tag 中保存的快照（CommentMeta.Document）
+                                                FlowDocument? doc = null;
+                                                if (border.Tag is CommentMeta meta && meta.Document != null)
+                                                    doc = meta.Document;
+                                                else
+                                                    doc = grid.Children.OfType<RichTextBox>().FirstOrDefault()?.Document;
+
+                                                if (doc != null)
+                                                {
+                                                    col.Item()
+                                               .PaddingBottom(12)
+                                               .Text(t =>
+                                                   {
+                                                       // 可统一评论默认样式
+                                                       t.DefaultTextStyle(x => x.FontSize(11));
+                                                       AppendFlowDocToQuest(t, doc);
+                                                   });
+                                                }
+                                                break;
+                                            }
                                     }
                                 }
-                            }
-                            else // Plot
+                            });
+
+                            page.Footer().AlignCenter().Text(x =>
                             {
-                                // Draw image
-                                var image = plotContentGrid.Children.OfType<Image>().FirstOrDefault();
-                                if (image != null && image.Source is BitmapImage bitmapImage)
-                                {
-                                    double left = borderLeft + (borderWidth - 700) / 2;
-                                    double top = borderTop + (borderHeight - 400) / 2;
-                                    double width = 700;
-                                    double height = 400;
+                                x.Span("Page "); x.CurrentPageNumber(); x.Span(" / "); x.TotalPages();
+                            });
+                        });
+                    })
+                    .GeneratePdf(filePath);
 
-                                    try
-                                    {
-                                        // Save BitmapImage to a temporary file
-                                        string tempFilePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"plot_{Guid.NewGuid()}.png");
-                                        using (FileStream fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write))
-                                        {
-                                            BitmapEncoder encoder = new PngBitmapEncoder();
-                                            encoder.Frames.Add(BitmapFrame.Create(bitmapImage));
-                                            encoder.Save(fileStream);
-                                        }
-
-                                        // Load image into XImage
-                                        XImage xImage = XImage.FromFile(tempFilePath);
-                                        gfx.DrawImage(xImage, left, top, width, height);
-
-                                        // Clean up temporary file
-                                        File.Delete(tempFilePath);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        MessageBox.Show($"Error rendering image to PDF: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Save the PDF  
-                    string pdfFile = saveFileDialog.FileName;
-                    pdfDocument.Save(pdfFile);
-
-                    MessageBox.Show($"PDF saved successfully to {pdfFile}!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
+                MessageBox.Show($"PDF saved successfully to {filePath}!", "Success",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving PDF: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error saving PDF: {ex.Message}", "Error",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
+        /* ===== 辅助方法：如项目里已存在同名方法，请删除以下重复定义 ===== */
+
+        /// <summary>
+        /// 将 FlowDocument 的段落/Run 样式写入 QuestPDF Text 描述器。
+        /// 保留粗体、斜体、字号、字体族；如需可扩展颜色、下划线等。
+        /// </summary>
+        // using System.Windows.Documents;
+        // using QuestPDF.Fluent;
+
+        private static void AppendFlowDocToQuest(QuestPDF.Fluent.TextDescriptor t, FlowDocument doc)
+        {
+            if (doc == null) return;
+
+            foreach (var block in doc.Blocks)
+            {
+                if (block is Paragraph para)
+                {
+                    // 把同一段里的 Run 依次追加到同一“行”，段尾手动换行
+                    foreach (var inline in para.Inlines)
+                    {
+                        if (inline is Run run)
+                        {
+                            var span = t.Span(run.Text ?? string.Empty);
+                            if (run.FontWeight == FontWeights.Bold) span = span.Bold();
+                            if (run.FontStyle == FontStyles.Italic) span = span.Italic();
+                            if (run.FontSize > 0) span = span.FontSize((float)run.FontSize);
+                            if (run.FontFamily != null) span = span.FontFamily(run.FontFamily.Source);
+                        }
+                        else if (inline is LineBreak)
+                        {
+                            // 段内显式换行
+                            t.Line("");
+                        }
+                    }
+                    // 段落结束：换到下一行
+                    t.Line("");
+                }
+                else if (block is List list)
+                {
+                    // 简单处理项目符号/编号：每个 ListItem 输出为一行，前缀一个“• ”
+                    foreach (ListItem item in list.ListItems)
+                    {
+                        foreach (var itemBlock in item.Blocks)
+                        {
+                            if (itemBlock is Paragraph p2)
+                            {
+                                t.Span("• ").SemiBold();
+                                foreach (var inline in p2.Inlines)
+                                {
+                                    if (inline is Run run)
+                                    {
+                                        var span = t.Span(run.Text ?? string.Empty);
+                                        if (run.FontWeight == FontWeights.Bold) span = span.Bold();
+                                        if (run.FontStyle == FontStyles.Italic) span = span.Italic();
+                                        if (run.FontSize > 0) span = span.FontSize((float)run.FontSize);
+                                        if (run.FontFamily != null) span = span.FontFamily(run.FontFamily.Source);
+                                    }
+                                    else if (inline is LineBreak)
+                                    {
+                                        t.Line("");
+                                    }
+                                }
+                                t.Line("");
+                            }
+                        }
+                    }
+                }
+                // 其它 Block（如 Table/Section）按需扩展
+            }
+        }
+
+
+        /// <summary>
+        /// 将 WPF BitmapSource 转为 PNG 字节（QuestPDF Image(byte[]) 需要）
+        /// </summary>
+        private static byte[]? WpfBitmapToPngBytes(BitmapSource source)
+        {
+            try
+            {
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(source));
+                using var ms = new System.IO.MemoryStream();
+                encoder.Save(ms);
+                return ms.ToArray();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+      
         private async void AddPlotButton_ClickAsync(object sender, RoutedEventArgs e)
         {
             try
@@ -1301,14 +1830,14 @@ namespace ForeSITETestApp
                 // Create JSON object
                 var graphData = new JObject
                 {
-                    ["Model"] = model,
-                    ["DataSource"] = dataSource,
-                    ["YearBack"] = yearBack,
-                    ["UseTrainSplit"] = useTrainSplit,
-                    ["BeginDate"] = beginDate,
-                    ["Freq"] = freq,
-                    ["Threshold"] = threshold,
-                    ["Title"] = plotTitle
+                    ["model"] = model,
+                    ["dataSource"] = dataSource,
+                    ["yearBack"] = yearBack,
+                    ["useTrainSplit"] = useTrainSplit,
+                    ["beginDate"] = beginDate,
+                    ["freq"] = freq,
+                    ["threshold"] = threshold,
+                    ["title"] = plotTitle
                 };
 
                 if (useTrainSplit)
@@ -1324,7 +1853,7 @@ namespace ForeSITETestApp
                         MessageBox.Show("Train Split Ratio must be a number between 0 and 1 (e.g., 0.8).", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
-                    graphData["TrainSplitRatio"] = trainSplitRatio;
+                    graphData["trainSplitRatio"] = trainSplitRatio;
                 }
                 else
                 {
@@ -1335,7 +1864,7 @@ namespace ForeSITETestApp
                         MessageBox.Show("Please select both Train End Date.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
-                    graphData["TrainEndDate"] = trainEndDate;
+                    graphData["trainEndDate"] = trainEndDate;
 
                 }
 
@@ -1397,7 +1926,7 @@ namespace ForeSITETestApp
 
 
                             // Add to DrawingCanvas
-                            Image plotImage = new Image
+                            System.Windows.Controls.Image plotImage = new System.Windows.Controls.Image
                             {
                                 Source = bitmap,
                                 Width = /*imageWidth*/700,
@@ -1435,8 +1964,8 @@ namespace ForeSITETestApp
                                 BorderBrush = Brushes.Gray,
                                 BorderThickness = new Thickness(1),
                                 Padding = new Thickness(0),
-                                VerticalContentAlignment = VerticalAlignment.Center,
-                                HorizontalContentAlignment = HorizontalAlignment.Center,
+                                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+                                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
                                 Cursor = Cursors.Hand
                             };
 
@@ -1469,6 +1998,18 @@ namespace ForeSITETestApp
 
                             // Set Grid as Border content
                             imageBorder.Child = contentGrid;
+                            // 把绘图参数和文件路径挂到 Tag，供模板导出/再生使用
+                            imageBorder.Tag = new JObject
+                            {
+                                // 完整参数对象（上文已构造的 graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
+                                ["graph"] = graphData,
+
+                                // 也附带当前图像路径，调度端可选用（或忽略）
+                                ["plot_path"] = file,
+
+                                // 再冗余出一个外层 title，便于快速读取
+                                ["title"] = plotTitle
+                            };
 
                             // Add to report elements
                             _reportElements.Add(new ReportElement
@@ -1480,7 +2021,7 @@ namespace ForeSITETestApp
                             // Redraw canvas
                             RedrawCanvas();
                             CheckAndManagePlaceholder();
-
+                            UpdateCanvasHeight();
                             MessageBox.Show($"Plot '{plotTitle}' added for model {model} from '{filePath}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 
 
@@ -1505,50 +2046,62 @@ namespace ForeSITETestApp
                 MessageBox.Show($"Error generating or adding plot: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
+      
         private void UpdateCanvasHeight()
         {
-            double canvasHeight = _reportElements.Any(e => e.Type == ReportElementType.Title) ? 60 : 0; // Title height
-            int plotCount = _reportElements.Count(e => e.Type == ReportElementType.Plot);
-            canvasHeight += plotCount * 410; // Each plot: 400px image + 10px padding
-            canvasHeight += plotCount > 0 ? (plotCount - 1) * 30 : 0; // Gaps between plots
-            canvasHeight += 30; // Bottom margin
-            DrawingCanvas.Height = Math.Max(canvasHeight, 300); // Minimum height for placeholder
+            double canvasHeight = 0;
+            foreach (var re in _reportElements)
+                canvasHeight += GetElementDefaultHeight(re);
+
+            int gaps = Math.Max(_reportElements.Count - 1, 0);
+            canvasHeight += gaps * 30; // 块间距
+            canvasHeight += 30;        // 底部留白
+
+            DrawingCanvas.Height = canvasHeight;
+        }
+        private double GetElementDefaultHeight(ReportElement re)
+        {
+            return re.Type switch
+            {
+                ReportElementType.Title => 60,
+                ReportElementType.Plot => 410,   // 400 图 + 10 padding
+                ReportElementType.Comment => Math.Max((re.Element as FrameworkElement)?.Height ?? 160, 160),
+                _ => 0
+            };
         }
 
         private void RedrawCanvas()
         {
-
             DrawingCanvas.Children.Clear();
 
+            double canvasWidth = Math.Max(DrawingCanvas.ActualWidth, 778);
+            double y = 0;
 
-            double topPosition = 0;
-            double canvasWidth = Math.Max(DrawingCanvas.ActualWidth, 778); // Ensure canvas is wide enough
-
-            foreach (var element in _reportElements)
+            foreach (var re in _reportElements)
             {
-                if (element.Element != null) // Ensure the element is not null
-                {
-                    Border border = element.Element;
-                    if (element.Type == ReportElementType.Title)
-                    {
-                        border.Width = canvasWidth * 0.9;
-                        Canvas.SetTop(border, 0);
-                        topPosition = 30; // Title height
-                    }
-                    else // Plot
-                    {
-                        border.Width = canvasWidth * 0.9;
-                        Canvas.SetTop(border, topPosition);
-                        topPosition += border.Height + 30; // 410px height + 30px gap
-                    }
-                    Canvas.SetLeft(border, (canvasWidth - border.Width) / 2);
-                    DrawingCanvas.Children.Add(border);
-                }
-            }
+                if (re.Element is not Border border) continue;
 
-            UpdateCanvasHeight();
+                border.Width = canvasWidth * 0.9;
+
+                // Comment 的换行宽度随容器调整
+                if (re.Type == ReportElementType.Comment)
+                {
+                    var rtb = (border.Child as Grid)?
+                              .Children.OfType<RichTextBox>().FirstOrDefault();
+                    if (rtb != null) rtb.Document.PageWidth = border.Width - 60;
+                }
+
+                border.Height = GetElementDefaultHeight(re);
+
+                Canvas.SetTop(border, y);
+                Canvas.SetLeft(border, (canvasWidth - border.Width) / 2.0);
+                DrawingCanvas.Children.Add(border);
+
+                y += border.Height + 30; // 间距
+            }
         }
+       
+
 
         private void TrainSplitCheckBox_Checked(object sender, RoutedEventArgs e)
         {
@@ -1581,5 +2134,267 @@ namespace ForeSITETestApp
                 _notebookWindow.Activate(); // Bring existing window to front
             }
         }
+
+       
+
+        private void btnAddModel_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void btnDeleteModel_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void lstModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+
+        }
+
+        private void btnSaveModel_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void btnAddProperty_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void btnDeleteProperty_Click(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void dgProperties_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+
+        }
+
+        private void SchedulerDelete_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (SchedulerTable.ItemsSource is not ObservableCollection<SchedulerTask> collection)
+                {
+                    MessageBox.Show("Scheduler table not bound to data collection.",
+                                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                var selectedRows = collection.Where(r => r.IsSelected).ToList();
+                if (!selectedRows.Any())
+                {
+                    MessageBox.Show("Please check at least one row to delete.",
+                                    "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                foreach (var row in selectedRows)
+                {
+                    if (DBHelper.DeleteSchedulerById(row.Id))
+                    {
+                        collection.Remove(row);
+                    }
+                }
+
+                MessageBox.Show("Checked scheduler rows deleted.",
+                                "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error deleting scheduler rows: {ex.Message}",
+                                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+
+        private void SchedulerSave_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (SchedulerTable.ItemsSource is not ObservableCollection<SchedulerTask> collection)
+                {
+                    MessageBox.Show("Scheduler table not bound to data collection.",
+                                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // 选中（打勾）的行
+                var selectedRows = collection.Where(r => r.IsSelected).ToList();
+                if (!selectedRows.Any())
+                {
+                    MessageBox.Show("Please check at least one row to save.",
+                                    "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 如果界面上有 RecipientEmailsBox 且不为空，则用它批量覆盖选中行的 Recipients
+                string? bulkRecipients = null;
+                if (this.FindName("RecipientEmailsBox") is TextBox recipientBox)
+                {
+                    var lines = recipientBox.Text?
+                        .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => x.Trim())
+                        .Where(x => x.Length > 0)
+                        .ToList();
+
+                    if (lines is { Count: > 0 })
+                        bulkRecipients = string.Join(",", lines);
+                }
+
+                int ok = 0, fail = 0;
+                foreach (var row in selectedRows)
+                {
+                    
+                    string recipients = bulkRecipients ?? (row.Recipients ?? string.Empty);
+                    string attachPath = row.AttachmentPath ?? string.Empty;
+                    string startDate = row.StartDate ?? string.Empty;   // 期望 YYYY-MM-DD
+                    string freq = row.Freq ?? string.Empty;
+
+                    if (DBHelper.UpdateScheduler(row.Id, recipients, attachPath, startDate, freq))
+                    {
+                        // 更新内存对象（便于 UI 立即反映；若用了 INotifyPropertyChanged，可省略）
+                        row.Recipients = recipients;
+                        row.AttachmentPath = attachPath;
+                        row.StartDate = startDate;
+                        row.Freq = freq;
+                        ok++;
+                    }
+                    else
+                    {
+                        fail++;
+                    }
+                }
+
+                string msg = $"Saved recipients for {ok} row(s).";
+                if (fail > 0) msg += $" {fail} row(s) failed.";
+                MessageBox.Show(msg, fail == 0 ? "Success" : "Warning",
+                                MessageBoxButton.OK,
+                                fail == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving scheduler recipients: {ex.Message}",
+                                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+        private bool TaskExists(string taskName)
+        {
+            var psi = new ProcessStartInfo("schtasks", $"/query /tn {taskName}")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var p = Process.Start(psi);
+            string output = p!.StandardOutput.ReadToEnd();
+            string error = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            return p.ExitCode == 0 && output.IndexOf(taskName, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private (int exit, string stdout, string stderr) RunSchTasks(string args, bool elevate = true)
+        {
+            var psi = new ProcessStartInfo("schtasks", args)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            if (elevate) psi.Verb = "runas";   // 触发UAC获取管理员权限
+            using var p = Process.Start(psi);
+            string output = p!.StandardOutput.ReadToEnd();
+            string error = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            return (p.ExitCode, output, error);
+        }
+
+        private void SchedulerStart_Click(object sender, RoutedEventArgs e)
+        {
+            const string taskName = "foresite_alerting";
+            string exePath = Path.Combine(AppContext.BaseDirectory, "ForeSITEScheduler.exe");
+
+            try
+            {
+                if (TaskExists(taskName))
+                {
+                    MessageBox.Show($"Task '{taskName}' already exists.", "Scheduler");
+                    return;
+                }
+
+                // schtasks /create /tn foresite_alerting /tr "C:\...\ForeSITEScheduler.exe" /sc daily /st 09:00 /f
+                string args = $"/create /tn {taskName} /tr \"\\\"{exePath}\\\"\" /sc daily /st 09:00 /f";
+                var (exit, stdout, stderr) = RunSchTasks(args);
+
+                if (exit == 0)
+                    MessageBox.Show($"Task '{taskName}' created successfully to run daily at 09:00.\n{stdout}", "Scheduler");
+                else
+                    MessageBox.Show($"Failed to create task.\n{stderr}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+
+        }
+
+        private void SchedulerEnd_Click(object sender, RoutedEventArgs e)
+        {
+            const string taskName = "foresite_alerting";
+            try
+            {
+                if (!TaskExists(taskName))
+                {
+                    MessageBox.Show($"Task '{taskName}' does not exist.", "Scheduler");
+                    return;
+                }
+
+                var (exit, stdout, stderr) = RunSchTasks($"/delete /tn {taskName} /f");
+                if (exit == 0)
+                    MessageBox.Show($"Task '{taskName}' deleted.\n{stdout}", "Scheduler");
+                else
+                    MessageBox.Show($"Failed to delete task.\n{stderr}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void SchedulerSelectCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is CheckBox cb && cb.DataContext is SchedulerTask row)
+                {
+                    if (cb.IsChecked == true)
+                    {
+                        string recipients = row.Recipients ?? string.Empty;
+
+                        // 把逗号/分号/换行分隔的邮箱改成 每行一个
+                        var lines = recipients
+                            .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(s => s.Trim())
+                            .Where(s => s.Length > 0);
+
+                        if (this.FindName("RecipientEmailsBox") is TextBox box)
+                            box.Text = string.Join(Environment.NewLine, lines);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error handling checkbox click: {ex.Message}",
+                                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
     }
 }

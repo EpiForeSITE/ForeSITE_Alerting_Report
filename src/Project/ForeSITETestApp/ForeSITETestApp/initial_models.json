@@ -1,0 +1,293 @@
+{
+  "InitialModels": [
+    {
+      "Name": "Farrington",
+      "FullName": "epysurv.models.timepoint.farrington.Farrington",
+      "Description": "For each time point uses a GLM to predict the number of counts according to the procedure by Farrington. Uses quasi-Poisson regression for outbreak detection.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "years_back",
+          "Title": "Years Back",
+          "Type": "int_list",
+          "DefaultValue": "3|4|5",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "int",
+          "DefaultValue": "1500",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "window_half_width",
+          "Title": "Window Half Width",
+          "Type": "int",
+          "DefaultValue": "3",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "reweight",
+          "Title": "Reweight Step",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.01",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "trend",
+          "Title": "Trend",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "past_period_cutoff",
+          "Title": "Past Period Cutoff",
+          "Type": "int",
+          "DefaultValue": "4",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "min_cases_in_past_periods",
+          "Title": "Min Cases In Past Periods",
+          "Type": "int",
+          "DefaultValue": "5",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "power_transform",
+          "Title": "Power Transform",
+          "Type": "string",
+          "DefaultValue": "2/3",
+          "DisplayInUI": false
+        }
+      ]
+    },
+    {
+      "Name": "Farrington Flexible",
+      "FullModelName": "epysurv.models.timepoint.farrington.FarringtonFlexible",
+      "Description": "Improved Farrington algorithm with flexible baseline period selection and enhanced reweighting procedures. Enhanced quasi-Poisson regression method for outbreak detection with better handling of overdispersion.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "years_back",
+          "Title": "Years Back",
+          "Type": "int",
+          "DefaultValue": "5",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "int",
+          "DefaultValue": "1500",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "window_half_width",
+          "Title": "Window Half Width",
+          "Type": "int",
+          "DefaultValue": "3",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "reweight",
+          "Title": "Reweight",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "weights_threshold",
+          "Title": "Weights Threshold",
+          "Type": "float",
+          "DefaultValue": "2.58",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.01",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "trend",
+          "Title": "Include Trend",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "trend_threshold",
+          "Title": "P-value Threshold for Trend",
+          "Type": "float",
+          "DefaultValue": "0.05",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "past_period_cutoff",
+          "Title": "Past Period Cutoff",
+          "Type": "int",
+          "DefaultValue": "4",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "min_cases_in_past_periods",
+          "Title": "Min Cases In Past Periods",
+          "Type": "int",
+          "DefaultValue": "5",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "power_transform",
+          "Title": "Power Transformation",
+          "Type": "string",
+          "DefaultValue": "2/3",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "past_weeks_not_included",
+          "Title": "Past Weeks Not Included",
+          "Type": "int",
+          "DefaultValue": "26",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "threshold_method",
+          "Title": "Threshold Method",
+          "Type": "string",
+          "DefaultValue": "delta",
+          "DisplayInUI": false
+        }
+      ]
+    },
+    {
+      "ModelName": "EARS C1",
+      "FullModelName": "epysurv.models.timepoint.ears.EarsC1",
+      "Description": "The C1 method uses the mean and standard deviation of the previous 7 days to calculate a threshold for the current day. An alarm is triggered if the count for the current day exceeds this threshold.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "int",
+          "DefaultValue": "3",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "baseline_days",
+          "Title": "Baseline Days",
+          "Type": "int",
+          "DefaultValue": "7",
+          "DisplayInUI": false
+        }
+      ]
+    },
+    {
+      "ModelName": "EARS C2",
+      "FullModelName": "epysurv.models.timepoint.ears.EarsC2",
+      "Description": "The C2 method is similar to C1 but includes a 2-day lag. It uses the mean and standard deviation of days -9 to -3 to calculate a threshold for the current day. An alarm is triggered if the count for the current day exceeds this threshold.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "int",
+          "DefaultValue": "3",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "baseline_days",
+          "Title": "Baseline Days",
+          "Type": "int",
+          "DefaultValue": "7",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "lag_days",
+          "Title": "Lag Days",
+          "Type": "int",
+          "DefaultValue": "2",
+          "DisplayInUI": false
+        }
+      ]
+    },
+    {
+      "ModelName": "EARS C3",
+      "FullModelName": "epysurv.models.timepoint.ears.EarsC3",
+      "Description": "The C3 method builds on C2 by incorporating a 3-day moving average of counts from days -2 to 0. It uses the mean and standard deviation of days -9 to -3 to calculate a threshold for the current day. An alarm is triggered if the 3-day moving average exceeds this threshold.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "int",
+          "DefaultValue": "3",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "baseline_days",
+          "Title": "Baseline Days",
+          "Type": "int",
+          "DefaultValue": "7",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "lag_days",
+          "Title": "Lag Days",
+          "Type": "int",
+          "DefaultValue": "2",
+          "DisplayInUI": false
+        }
+      ]
+    },
+    {
+      "ModelName": "Bayesian Outbreak Detection Algorithm (BODA)",
+      "FullModelName": "epysurv.models.timepoint.boda.Boda",
+      "Description": "A Bayesian hierarchical model for outbreak detection that accounts for temporal trends and seasonality. It uses Integrated Nested Laplace Approximations (INLA) for efficient Bayesian inference.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "threshold",
+          "Title": "Threshold",
+          "Type": "float",
+          "DefaultValue": "0.95",
+          "DisplayInUI": true
+        },
+        {
+          "Name": "trend",
+          "Title": "Include Trend",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "seasonality",
+          "Title": "Include Seasonality",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        },
+        {
+          "Name": "overdispersion",
+          "Title": "Account for Overdispersion",
+          "Type": "bool",
+          "DefaultValue": "true",
+          "DisplayInUI": false
+        }
+      ]
+    }
+
+
+  ]
+
+}
