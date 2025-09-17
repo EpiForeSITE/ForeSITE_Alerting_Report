@@ -11,7 +11,7 @@
 - **Data Source Management**: Add, edit, and delete data sources from Providers with API integration.
 - **Plot Visualization**: Generate plots using CDC public surveillance data or user-imported datasets, with configurable parameters (e.g., data source, time range, threshold, model like Farrington).
 - **Data Import**: Import custom surveillance data (e.g., CSV, JSON) for processing with `epySurv` via the Flask API.
-- **Automated Scheduling**: Schedule monthly report generation using Windows Task Scheduler, with automatic email delivery via Outlook.
+- **Automated Scheduling**: Schedule monthly report generation using Windows Task Scheduler, with automatic email delivery via GMail.
 - **Rich Text Editing**: Customize report titles with rich text formatting (bold, italic, etc.).
 - **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
 - **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
