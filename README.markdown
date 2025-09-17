@@ -20,17 +20,25 @@
 
 ## Changelog
 
-### Version 0.7 (August 25, 2025)
+### Version 0.8 
+We’ve added support for Windows scheduled tasks to automate report delivery.
+Users can now configure a schedule (daily, weekly, or monthly) directly within the application. Once set, the system will automatically:
+- Generate updated reports based on the latest data
+- Export them to PDF
+- Send them to the specified recipients via email
+This means reports are sent hands-free and on time, according to your preferred schedule—no manual steps required.
+
+### Version 0.7 
 - Added R support in Jupyter-like notebook to enable seamless data exchnage between R and Python
 - Updated log system for users to better understand the output
 
-### Version 0.6 (August 18, 2025)
+### Version 0.6 
 - Added a Jupyter-like notebook for advanced users to perform data analysis at runtime.
 - Users can now add, run, delete, save, and load code cells in a non-modal window.
 - Enhanced integration with Python environment for code execution.
 - Minor bug fixes and performance improvements in report rendering.
 
-### Version 0.5 (July 8, 2025)
+### Version 0.5 
 - Supported four CDC data sources, including:
 - **COVID-19 Testing** （only 2020 CDC Covid Testing data;)
 - **Real-time Deaths (COVID-19, Pneumonia, and Influenza)**
