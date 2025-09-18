@@ -693,7 +693,7 @@ namespace SchedulerRunner
                         AttachmentPath = reader.IsDBNull(2) ? null : reader.GetString(2),
                         StartDate = reader.IsDBNull(3) ? null : reader.GetString(3),
                         Freq = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        IsSelected = false   // 默认未勾选
+                        IsSelected = false   // 
                     };
                     schedulers.Add(task);
                 }

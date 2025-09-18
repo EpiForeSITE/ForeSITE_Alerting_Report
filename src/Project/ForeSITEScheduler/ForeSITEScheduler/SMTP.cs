@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace ForeSITEScheduler
 {
-    // ===== SMTP 配置 =====
+    // ===== SMTP config =====
     public  sealed class SmtpConfig
     {
         public string Host { get; init; } = "";
@@ -21,10 +21,10 @@ namespace ForeSITEScheduler
         public string? FromDisplay { get; init; }   // display name
 
 
-        // 从环境变量或 smtp.json 读取 SMTP 配置
+        // 
         public static SmtpConfig LoadSmtpConfig()
         {
-            // 1) 优先环境变量
+            // 1) 
             string host = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "";
             string portStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "";
             string user = Environment.GetEnvironmentVariable("SMTP_USER") ?? "";
@@ -53,7 +53,7 @@ namespace ForeSITEScheduler
                 };
             }
 
-            // 2) 次选读取程序同目录 config.json（可选）
+            // 2) read config.json
             string currentDirectory = Directory.GetCurrentDirectory();
             string pythonDirectory = Path.Combine(currentDirectory, "Server");
             var jsonPath = Path.Combine(pythonDirectory, "config.json");
@@ -74,11 +74,11 @@ namespace ForeSITEScheduler
                 };
             }
 
-            // 3) 默认（空配置，调用处会检查）
+            // 3)
             return new SmtpConfig();
         }
 
-        // 解析收件人（支持逗号/分号/换行）
+        // resolve recipients string
         public static List<string> ParseRecipients(string recipients)
         {
             return (recipients ?? "")
@@ -89,7 +89,7 @@ namespace ForeSITEScheduler
                 .ToList();
         }
 
-        // 发送邮件（单个附件）
+        // send email
         public static async Task SendReportEmailAsync(
             SmtpConfig cfg, IEnumerable<string> recipients, string subject, string body, string attachmentPath)
         {

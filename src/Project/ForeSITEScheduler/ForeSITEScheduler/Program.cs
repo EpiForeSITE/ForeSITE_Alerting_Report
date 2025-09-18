@@ -15,19 +15,16 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-// 引用你现有的 DB 助手与实体
-// 如果 DBHelper/SchedulerTask 在其他命名空间，请把下面的 using 改为正确命名空间；
-// 或者直接在代码里使用全名。
+
 using static System.Console;
 
 internal static class Program
 {
-    // ================== 配置 ==================
+    // ================== configration ==================
     private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
     private const int SERVER_PORT = 5001;
 
-    // 服务器启动所需（与 WPF 程序保持一致）
-    // 这些路径可按你的项目目录结构调整
+    
     private static readonly string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
     private static readonly string ServerDir = Path.Combine(BaseDir, "Server");
     private static readonly string configPath = Path.Combine(ServerDir, "config.json");
@@ -36,12 +33,12 @@ internal static class Program
     private static string PythonExe = Path.Combine(BaseDir, @"epysurv311\python.exe");
     private static string ServerScript = Path.Combine(ServerDir, "epyflaServer.py");
     private static string R_HOME = Path.Combine(BaseDir, @"epysurv311\Lib\R");
-    private static string FullCommand = ""; // 完整启动命令
+    private static string FullCommand = ""; 
 
     private static readonly HttpClient Http = new HttpClient { BaseAddress = new Uri(SERVER_BASE_URL), Timeout = TimeSpan.FromSeconds(60) };
     private static Process? FlaskProcess;
 
-    // ================== 入口 ==================
+    // ================== Entry ==================
     private static async Task<int> Main(string[] args)
     {
         Http.DefaultRequestHeaders.Add("User-Agent", "NotebookApp/1.0");
@@ -88,7 +85,7 @@ internal static class Program
         {
             // Ensure the directory exists before creating the log file
             Directory.CreateDirectory(Path.GetDirectoryName(logPath) ?? documentsPath);
-            File.Create(logPath).Close(); // 创建空文件
+            File.Create(logPath).Close(); // 
         }
 
         // Configure R environment variables
@@ -106,14 +103,14 @@ internal static class Program
 
         try
         {
-            // QuestPDF 许可证
+            // QuestPDF license
             QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
-            // 1) 确保 Flask 健康
+            // 1) ensure Flask server is running
             await EnsureServerAsync();
 
-            // 2) 读取 scheduler 表（使用相同的 DBHelper）
-            //    注意：DBHelper.GetAllSchedulers() 返回 ObservableCollection<SchedulerTask>
+            // 2) read all scheduled tasks from DB
+            
             var tasks = DBHelper.GetAllSchedulers().ToList();
             if (tasks.Count == 0)
             {
@@ -121,7 +118,7 @@ internal static class Program
                 return 0;
             }
 
-            // 3) 按日期频率筛选“今天应运行”的任务
+            // 3) select due tasks
             var today = DateTime.Today;
             var due = tasks.Where(t => IsDueToday(today, t.StartDate, t.Freq)).ToList();
             if (due.Count == 0)
@@ -130,7 +127,7 @@ internal static class Program
                 return 0;
             }
 
-            // 4) 执行任务
+            // 4) execute each due task
             foreach (var task in due)
             {
                 WriteLine($"Running scheduler Id={task.Id} ...");
@@ -141,18 +138,18 @@ internal static class Program
                     continue;
                 }
 
-                // 读取 JSON 模板
+                // read template
                 var jsonText = File.ReadAllText(task.AttachmentPath);
                 var template = JObject.Parse(jsonText);
 
-                // 给模板打个来源路径，便于确定输出目录
+                // 
                 template["__sourcePath"] = task.AttachmentPath;
 
-                // 处理模板：生成图、合成 PDF
+                // 
                 string pdfOut = await ProcessTemplateAsync(template);
                 WriteLine($"  ✅ PDF generated: {pdfOut}");
 
-                // === 新增：发送邮件 ===
+                // === email ===
                 try
                 {
                     var recipients = SmtpConfig.ParseRecipients(task.Recipients ?? "");
@@ -204,7 +201,7 @@ internal static class Program
         }
     }
 
-    // ================== 服务器相关 ==================
+    // ================== Server ==================
 
     private static async Task EnsureServerAsync()
     {
@@ -217,18 +214,18 @@ internal static class Program
         WriteLine("Flask not healthy. Trying graceful shutdown...");
         await TryGracefulShutdownAsync();
 
-        // 如仍占用端口，强杀
+        // if still not healthy, kill process on port
         if (await IsPortInUseAsync(SERVER_PORT))
         {
             WriteLine("Port still busy, killing process on port...");
             await KillProcessOnPortAsync(SERVER_PORT);
         }
 
-        // 启动 Flask
+        // start Flask
         WriteLine("Starting Flask process...");
         await StartFlaskAsync();
 
-        // 等待健康
+        // wait healthy
         var ok = await WaitHealthyAsync(30);
         if (!ok) throw new Exception("Flask failed to become healthy.");
         WriteLine("Flask is healthy.");
@@ -293,7 +290,7 @@ internal static class Program
     {
         try
         {
-            // 查 IPv4 & IPv6
+            // check IPv4 & IPv6
             string cmd = $"/c netstat -ano | findstr :{port}";
             var psi = new ProcessStartInfo("cmd.exe", cmd)
             {
@@ -319,12 +316,12 @@ internal static class Program
             {
                 try
                 {
-                    // 先用 .NET 方式
+                    // first try .NET kill
                     Process.GetProcessById(pid).Kill(entireProcessTree: true);
                 }
                 catch
                 {
-                    // 兜底用 taskkill（需要管理员）
+                    // finally use taskkill
                     try
                     {
                         var tk = new ProcessStartInfo("cmd.exe", $"/c taskkill /F /T /PID {pid}")
@@ -339,7 +336,7 @@ internal static class Program
                 }
             }
 
-            // 等端口释放
+            // wait port closed
             var until = DateTime.UtcNow.AddSeconds(8);
             while (DateTime.UtcNow < until)
             {
@@ -369,7 +366,7 @@ internal static class Program
             WorkingDirectory = Path.GetDirectoryName(ServerDir)
         };
 
-        // 设置 R 环境（如果你的服务器需要）
+        // set R environment variables
         start.Environment["R_HOME"] = R_HOME;
 
         FlaskProcess = new Process { StartInfo = start, EnableRaisingEvents = true };
@@ -380,7 +377,7 @@ internal static class Program
         FlaskProcess.BeginErrorReadLine();
     }
 
-    // ================== 调度判断 ==================
+    // ====================================
 
     private static bool IsDueToday(DateTime today, string? startDate, string? freq)
     {
@@ -413,15 +410,15 @@ internal static class Program
         return false;
     }
 
-    // ================== 模板处理 / 生成 PDF ==================
+    // ====================================
 
     private static async Task<string> ProcessTemplateAsync(JObject template)
     {
-        // 从模板取 schedule（作为当次运行的条件）
+        // read schedule info
         string scheduleStart = template["schedule"]?["startDate"]?.ToString() ?? DateTime.Today.ToString("yyyy-MM-dd");
         string scheduleFreq = template["schedule"]?["frequency"]?.ToString() ?? "By Day";
 
-        // 收集文本与图像
+        // collect blocks and images
         var blocks = new List<(string text, bool center)>();
         var images = new List<byte[]>();
 
@@ -444,7 +441,7 @@ internal static class Program
             }
             else if (type == "Plot")
             {
-                // 取参数并替换 BeginDate
+                // replace BeginDate in params
                 var param = tok["params"] as JObject ?? new JObject();
                 param["BeginDate"] = scheduleStart;
 
@@ -472,7 +469,7 @@ internal static class Program
         var txt = await resp.Content.ReadAsStringAsync(cts.Token);
         var jo = JObject.Parse(txt);
 
-        // 兼容两种字段：plot_path 优先，其次是 file
+        // compatibility: plot_path or file
         return jo["plot_path"]?.ToString() ?? jo["file"]?.ToString();
     }
 
@@ -502,7 +499,7 @@ internal static class Program
 
                     page.Content().Column(col =>
                     {
-                        // 文本块（Title 居中、Comment 左对齐）
+                        // 
                         foreach (var (text, center) in blocks)
                         {
                             col.Item().PaddingBottom(12).Text(t =>
@@ -512,7 +509,7 @@ internal static class Program
                             });
                         }
 
-                        // 图像
+                        // plots
                         foreach (var img in images)
                             col.Item().PaddingBottom(18).Image(img).FitWidth();
                     });
