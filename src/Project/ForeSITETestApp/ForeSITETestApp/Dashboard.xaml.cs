@@ -13,7 +13,7 @@ using Newtonsoft.Json.Linq;
 //using PdfSharp.Drawing;
 //using PdfSharp.Fonts;
 //using PdfSharp.Pdf;
-// 移除：using PdfSharp.*; 以及 GlobalFontSettings.FontResolver 等相关
+// remove：using PdfSharp.*; and GlobalFontSettings.FontResolver 
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -739,7 +739,7 @@ namespace ForeSITETestApp
                     return;
                 }
 
-                // 选择保存路径
+                // Choose Save File Dialog
                 var sfd = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "JSON Template (*.json)|*.json",
@@ -749,7 +749,7 @@ namespace ForeSITETestApp
                 if (sfd.ShowDialog() != true)
                     return;
 
-                // 根对象
+                
                 var root = new JObject
                 {
                     ["templateVersion"] = "1.0",
@@ -771,7 +771,7 @@ namespace ForeSITETestApp
                     // Title
                     if (re.Type == ReportElementType.Title)
                     {
-                        // 优先 _titleDocument；否则从 UI 获取 TextBlock / RichTextBox 文档
+                        // priority _titleDocument；
                         FlowDocument? titleDoc = _titleDocument ?? TryGetTitleFlowDoc(border);
                         string flowXaml = FlowDocToXaml(titleDoc);
                         string text = FlowDocToPlainText(titleDoc);
@@ -790,20 +790,20 @@ namespace ForeSITETestApp
                     // Plot
                     else if (re.Type == ReportElementType.Plot)
                     {
-                        // 从 Tag 里抽取参数（推荐在创建 plot 时把 graph 写入 Tag）
+                        // read arguments from Tag 
                         var param = ExtractPlotParamsFromTag(border?.Tag);
 
                         var plotJson = new JObject
                         {
                             ["type"] = "Plot",
-                            ["params"] = param // 只含关键字段；其余没有则不会出现
+                            ["params"] = param 
                         };
                         layout.Add(plotJson);
                     }
                     // Comment
                     else if (re.Type == ReportElementType.Comment)
                     {
-                        // 我们前面设计：CommentMeta 存在于 border.Tag.Document
+                        
                         FlowDocument? doc = null;
 
                         if (border.Tag is CommentMeta meta && meta.Document != null)
@@ -828,14 +828,14 @@ namespace ForeSITETestApp
                     }
                 }
 
-                // 附加调度占位（你的 schedule app 可在运行时替换）
+                // TODO: it will be nice to validate layout has at least one Plot
                 root["layout"] = layout;
 
-                // 默认值
+                
                 string scheduleStart = "";
                 string scheduleFreq = "";
 
-                // 从第一个 Plot 的 Tag 里取 beginDate 和 freq
+                
                 var firstPlot = _reportElements.FirstOrDefault(e => e.Type == ReportElementType.Plot);
                 if (firstPlot?.Element is Border b && b.Tag is JObject tag && tag["graph"] is JObject g)
                 {
@@ -843,7 +843,7 @@ namespace ForeSITETestApp
                     scheduleFreq = g["Freq"]?.ToString() ?? "";
                 }
 
-                // 写入 schedule 部分
+                
                 root["schedule"] = new JObject
                 {
                     ["startDate"] = scheduleStart,   // e.g. "2025-09-12"
@@ -854,12 +854,12 @@ namespace ForeSITETestApp
 
                 File.WriteAllText(sfd.FileName, root.ToString(Newtonsoft.Json.Formatting.Indented));
 
-                // ========== 2) 写入 scheduler 表 ==========
-                // 收件人（若你 XAML 用的是 x:Name="RecipientEmailsBox"）
+                // ========== 2) write into scheduler  ==========
+                // from x:Name="RecipientEmailsBox"
                 string recipients = "";
                 if (this.FindName("RecipientEmailsBox") is TextBox recipientBox && !string.IsNullOrWhiteSpace(recipientBox.Text))
                 {
-                    // 允许用户每行一个邮箱；这里存为逗号分隔
+                    
                     var lines = recipientBox.Text
                         .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(x => x.Trim())
@@ -869,8 +869,8 @@ namespace ForeSITETestApp
 
                 var task = new SchedulerTask
                 {
-                    Recipients = recipients,          // 可为空
-                    AttachmentPath = sfd.FileName,        // 模板/附件路径（全路径）
+                    Recipients = recipients,          // allow null or empty
+                    AttachmentPath = sfd.FileName,        // full path to the saved template
                     StartDate = scheduleStart ?? "", // "YYYY-MM-DD"
                     Freq = scheduleFreq ?? ""  // "By Week"/"daily"/"weekly"/...
                 };
@@ -900,25 +900,25 @@ namespace ForeSITETestApp
         // refresh Scheduler DataGrid 
         private void RefreshSchedulerUI()
         {
-            // 重新取库里最新数据
+            
             var latest = DBHelper.GetAllSchedulers(); // ObservableCollection<SchedulerTask>
 
             if (SchedulerTable.ItemsSource is ObservableCollection<SchedulerTask> current)
             {
                 current.Clear();
                 foreach (var item in latest)
-                    current.Add(item);       // 保持同一个集合实例，避免绑定丢失
+                    current.Add(item);       
             }
             else
             {
-                SchedulerTable.ItemsSource = latest;  // 首次绑定
+                SchedulerTable.ItemsSource = latest;  
             }
 
           
         }
 
 
-        // 将 FlowDocument 序列化为 XAML 字符串；null -> ""
+        //  FlowDocument =>xml null-->"
         private static string FlowDocToXaml(FlowDocument? doc)
         {
             if (doc == null) return "";
@@ -930,7 +930,7 @@ namespace ForeSITETestApp
             catch { return ""; }
         }
 
-        // 提取 FlowDocument 的纯文本（Run 拼接）
+        
         private static string FlowDocToPlainText(FlowDocument? doc)
         {
             if (doc == null) return "";
@@ -942,12 +942,12 @@ namespace ForeSITETestApp
             catch { return ""; }
         }
 
-        // 从 Tag（通常是 JObject graph 或含 graph 的容器）抽取关键 Plot 参数
+        
         private static JObject ExtractPlotParamsFromTag(object? tag)
         {
-            // 目标：只保留 title / model / yearBack / trainSplitRatio（如存在）
-            // 如果你在 Tag 里保存的是： new JObject { ["graph"] = graphData, ["title"]=..., ... }
-            // 下面会优先从 tag["graph"] 读取；否则尝试直接从 tag 读取。
+            // target: only save itle / model / yearBack / trainSplitRatio (if exist)
+            // if save into Tag： new JObject { ["graph"] = graphData, ["title"]=..., ... }
+            // read first from tag["graph"] ；otherwise read from tag 
 
             string? title = null;
             string? model = null;
@@ -967,7 +967,7 @@ namespace ForeSITETestApp
             {
                 if (tag is JObject jtag)
                 {
-                    // 可能存在 graph
+                    
                     var g = jtag["graph"] as JObject ?? jtag;
 
                     title = S(jtag["title"]) ?? S(g["Title"]);
@@ -975,7 +975,7 @@ namespace ForeSITETestApp
                     yearBack = S(g["YearBack"]) ?? S(g["years_back"]);
                     trainSplitRatio = S(g["TrainSplitRatio"]);
 
-                    // 可选的其它字段（有则带上，便于将来扩展）
+                    
                     dataSource = S(g["DataSource"]);
                     beginDate = S(g["BeginDate"]);
                     freq = S(g["Freq"]);
@@ -984,17 +984,17 @@ namespace ForeSITETestApp
                     trainEndDate = S(g["TrainEndDate"]);
                 }
             }
-            catch { /* 忽略解析异常 */ }
+            catch { /*  */ }
 
             var o = new JObject();
 
-            // 只输出你指定的关键字段
+            
             if (!string.IsNullOrEmpty(title)) o["title"] = title;
             if (!string.IsNullOrEmpty(model)) o["model"] = model;
             if (!string.IsNullOrEmpty(yearBack)) o["yearBack"] = yearBack;
             if (!string.IsNullOrEmpty(trainSplitRatio)) o["trainSplitRatio"] = trainSplitRatio;
 
-            // 下面这些“可选字段”若存在，就一起带上；否则省略
+            
             if (!string.IsNullOrEmpty(dataSource)) o["dataSource"] = dataSource;
             if (!string.IsNullOrEmpty(beginDate)) o["beginDate"] = beginDate;
             if (!string.IsNullOrEmpty(freq)) o["freq"] = freq;
@@ -1005,7 +1005,7 @@ namespace ForeSITETestApp
             return o;
         }
 
-        // 从 Title Border 提取 FlowDocument（当 _titleDocument 为空时的兜底）
+       
         private static FlowDocument? TryGetTitleFlowDoc(Border titleBorder)
         {
             if (titleBorder?.Child is Grid g)
@@ -1384,17 +1384,17 @@ namespace ForeSITETestApp
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            // 初始文档（空段落），并立即存一个快照到 Tag
+            
             var initialParagraph = new Paragraph(new Run(""))
             {
-                LineHeight = 16,                     // 每行高度
+                LineHeight = 16,                     
                 LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-                Margin = new Thickness(0, 2, 0, 2)   // 段落上下间距（上 2px，下 2px）
+                Margin = new Thickness(0, 2, 0, 2)  
             };
 
             var initialDoc = new FlowDocument(initialParagraph)
             {
-                PageWidth = commentBorder.Width - 60,  // 控制换行宽度，和 UI 一致
+                PageWidth = commentBorder.Width - 60,  
             };
 
             var rich = new RichTextBox
@@ -1407,14 +1407,14 @@ namespace ForeSITETestApp
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 MinHeight = 100,
                 Document = initialDoc
-                //Width = canvasWidth * 0.9 - 60 // 给按钮留点位置
+                //Width = canvasWidth * 0.9 - 60 
             };
 
-            // 动态高度
+           
             rich.TextChanged += (s, e) =>
             {
                 rich.Document.PageWidth = commentBorder.Width - 60;
-                // 统一段落紧凑样式（用户在编辑器中新加段落也会套用）
+                
                 foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
                 {
                     p.LineHeight = 16;
@@ -1426,7 +1426,7 @@ namespace ForeSITETestApp
                 RedrawCanvas();
                 UpdateCanvasHeight();
 
-                // 更新 Tag 中的快照（便于导出 PDF 使用同一份 FlowDocument）
+                
                 if (commentBorder.Tag is CommentMeta meta)
                     meta.Document = CloneFlowDocument(rich.Document);
             };
@@ -1434,7 +1434,7 @@ namespace ForeSITETestApp
             Grid.SetColumn(rich, 0);
             Grid.SetRow(rich, 0);
 
-            // 在 Border.Tag 中保存评论的 FlowDocument 快照
+           
             commentBorder.Tag = new CommentMeta
             {
                 Document = CloneFlowDocument(initialDoc)
@@ -1472,7 +1472,7 @@ namespace ForeSITETestApp
                 editor.Owner = Window.GetWindow(this);
                 editor.ShowDialog();
 
-                // 统一段落紧凑样式 & PageWidth
+                
                 rich.Document.PageWidth = commentBorder.Width - 60;
                 foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
                 {
@@ -1482,10 +1482,10 @@ namespace ForeSITETestApp
                 }
 
 
-                // 更新高度
+               
                 commentBorder.Height = Math.Max(160, rich.ExtentHeight + 20);
 
-                // 更新 Tag 快照
+               
                 if (commentBorder.Tag is CommentMeta meta)
                     meta.Document = CloneFlowDocument(rich.Document);
 
@@ -1521,7 +1521,7 @@ namespace ForeSITETestApp
 
             deleteButton.Click += (s, args) =>
             {
-                // 从 _reportElements 移除对应的元素，再重绘
+                
                 _reportElements.RemoveAll(e => ReferenceEquals(e.Element, commentBorder));
                 RedrawCanvas();
                 CheckAndManagePlaceholder();
@@ -1581,7 +1581,7 @@ namespace ForeSITETestApp
                     return;
                 }
 
-                // 选择保存路径
+               
                 var dlg = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "PDF Files (*.pdf)|*.pdf",
@@ -1593,7 +1593,7 @@ namespace ForeSITETestApp
 
                 string filePath = dlg.FileName;
 
-                // QuestPDF 许可（如有商业授权请替换）
+                
                 QuestPDF.Settings.License = LicenseType.Community;
 
                 Document
@@ -1607,7 +1607,7 @@ namespace ForeSITETestApp
 
                             page.Content().Column(col =>
                             {
-                                // 按 _reportElements 的顺序输出
+                                
                                 foreach (var re in _reportElements)
                                 {
                                     if (re.Element is not Border border || border.Child is not Grid grid)
@@ -1617,7 +1617,7 @@ namespace ForeSITETestApp
                                     {
                                         case ReportElementType.Title:
                                             {
-                                                // 优先使用 _titleDocument；否则从 TextBlock 退化为纯文本
+                                               
                                                 FlowDocument titleDoc = _titleDocument
                                                                 ?? new FlowDocument(new Paragraph(new Run(
                                                                     grid.Children.OfType<TextBlock>().FirstOrDefault()?.Text ?? "")));
@@ -1646,7 +1646,7 @@ namespace ForeSITETestApp
 
                                         case ReportElementType.Comment:
                                             {
-                                                // 优先读取 Border.Tag 中保存的快照（CommentMeta.Document）
+                                                
                                                 FlowDocument? doc = null;
                                                 if (border.Tag is CommentMeta meta && meta.Document != null)
                                                     doc = meta.Document;
@@ -1659,7 +1659,7 @@ namespace ForeSITETestApp
                                                .PaddingBottom(12)
                                                .Text(t =>
                                                    {
-                                                       // 可统一评论默认样式
+                                                       
                                                        t.DefaultTextStyle(x => x.FontSize(11));
                                                        AppendFlowDocToQuest(t, doc);
                                                    });
@@ -1688,11 +1688,9 @@ namespace ForeSITETestApp
             }
         }
 
-        /* ===== 辅助方法：如项目里已存在同名方法，请删除以下重复定义 ===== */
+        /* ===== help methods ===== */
 
         /// <summary>
-        /// 将 FlowDocument 的段落/Run 样式写入 QuestPDF Text 描述器。
-        /// 保留粗体、斜体、字号、字体族；如需可扩展颜色、下划线等。
         /// </summary>
         // using System.Windows.Documents;
         // using QuestPDF.Fluent;
@@ -1705,7 +1703,7 @@ namespace ForeSITETestApp
             {
                 if (block is Paragraph para)
                 {
-                    // 把同一段里的 Run 依次追加到同一“行”，段尾手动换行
+                   
                     foreach (var inline in para.Inlines)
                     {
                         if (inline is Run run)
@@ -1718,16 +1716,16 @@ namespace ForeSITETestApp
                         }
                         else if (inline is LineBreak)
                         {
-                            // 段内显式换行
+                           
                             t.Line("");
                         }
                     }
-                    // 段落结束：换到下一行
+                    
                     t.Line("");
                 }
                 else if (block is List list)
                 {
-                    // 简单处理项目符号/编号：每个 ListItem 输出为一行，前缀一个“• ”
+                    
                     foreach (ListItem item in list.ListItems)
                     {
                         foreach (var itemBlock in item.Blocks)
@@ -1755,13 +1753,13 @@ namespace ForeSITETestApp
                         }
                     }
                 }
-                // 其它 Block（如 Table/Section）按需扩展
+               
             }
         }
 
 
         /// <summary>
-        /// 将 WPF BitmapSource 转为 PNG 字节（QuestPDF Image(byte[]) 需要）
+       
         /// </summary>
         private static byte[]? WpfBitmapToPngBytes(BitmapSource source)
         {
@@ -1998,16 +1996,16 @@ namespace ForeSITETestApp
 
                             // Set Grid as Border content
                             imageBorder.Child = contentGrid;
-                            // 把绘图参数和文件路径挂到 Tag，供模板导出/再生使用
+                            
                             imageBorder.Tag = new JObject
                             {
-                                // 完整参数对象（上文已构造的 graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
+                                // full parameters（ graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
                                 ["graph"] = graphData,
 
-                                // 也附带当前图像路径，调度端可选用（或忽略）
+                               
                                 ["plot_path"] = file,
 
-                                // 再冗余出一个外层 title，便于快速读取
+                               
                                 ["title"] = plotTitle
                             };
 
@@ -2054,8 +2052,8 @@ namespace ForeSITETestApp
                 canvasHeight += GetElementDefaultHeight(re);
 
             int gaps = Math.Max(_reportElements.Count - 1, 0);
-            canvasHeight += gaps * 30; // 块间距
-            canvasHeight += 30;        // 底部留白
+            canvasHeight += gaps * 30; 
+            canvasHeight += 30;        
 
             DrawingCanvas.Height = canvasHeight;
         }
@@ -2064,7 +2062,7 @@ namespace ForeSITETestApp
             return re.Type switch
             {
                 ReportElementType.Title => 60,
-                ReportElementType.Plot => 410,   // 400 图 + 10 padding
+                ReportElementType.Plot => 410,   // 400 plot + 10 padding
                 ReportElementType.Comment => Math.Max((re.Element as FrameworkElement)?.Height ?? 160, 160),
                 _ => 0
             };
@@ -2083,7 +2081,7 @@ namespace ForeSITETestApp
 
                 border.Width = canvasWidth * 0.9;
 
-                // Comment 的换行宽度随容器调整
+                // Comment 
                 if (re.Type == ReportElementType.Comment)
                 {
                     var rtb = (border.Child as Grid)?
@@ -2097,7 +2095,7 @@ namespace ForeSITETestApp
                 Canvas.SetLeft(border, (canvasWidth - border.Width) / 2.0);
                 DrawingCanvas.Children.Add(border);
 
-                y += border.Height + 30; // 间距
+                y += border.Height + 30; 
             }
         }
        
@@ -2222,7 +2220,7 @@ namespace ForeSITETestApp
                     return;
                 }
 
-                // 选中（打勾）的行
+                // select checked rows
                 var selectedRows = collection.Where(r => r.IsSelected).ToList();
                 if (!selectedRows.Any())
                 {
@@ -2231,7 +2229,7 @@ namespace ForeSITETestApp
                     return;
                 }
 
-                // 如果界面上有 RecipientEmailsBox 且不为空，则用它批量覆盖选中行的 Recipients
+                // if bulk recipient emails provided, use them for all selected rows
                 string? bulkRecipients = null;
                 if (this.FindName("RecipientEmailsBox") is TextBox recipientBox)
                 {
@@ -2251,12 +2249,12 @@ namespace ForeSITETestApp
                     
                     string recipients = bulkRecipients ?? (row.Recipients ?? string.Empty);
                     string attachPath = row.AttachmentPath ?? string.Empty;
-                    string startDate = row.StartDate ?? string.Empty;   // 期望 YYYY-MM-DD
+                    string startDate = row.StartDate ?? string.Empty;   // YYYY-MM-DD
                     string freq = row.Freq ?? string.Empty;
 
                     if (DBHelper.UpdateScheduler(row.Id, recipients, attachPath, startDate, freq))
                     {
-                        // 更新内存对象（便于 UI 立即反映；若用了 INotifyPropertyChanged，可省略）
+                        // update successful, update the memory object too
                         row.Recipients = recipients;
                         row.AttachmentPath = attachPath;
                         row.StartDate = startDate;
@@ -2308,7 +2306,7 @@ namespace ForeSITETestApp
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            if (elevate) psi.Verb = "runas";   // 触发UAC获取管理员权限
+            if (elevate) psi.Verb = "runas";   // trigger UAC
             using var p = Process.Start(psi);
             string output = p!.StandardOutput.ReadToEnd();
             string error = p.StandardError.ReadToEnd();
@@ -2378,7 +2376,7 @@ namespace ForeSITETestApp
                     {
                         string recipients = row.Recipients ?? string.Empty;
 
-                        // 把逗号/分号/换行分隔的邮箱改成 每行一个
+                        // 
                         var lines = recipients
                             .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(s => s.Trim())
