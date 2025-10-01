@@ -3,20 +3,38 @@
 <img src="images/foreSITEAlertingReport_icon2.jpg" alt="ForeSITE Alerting Report Logo" width="200"/>
 
 
-**ForeSITE Alerting Report** is a C# WPF application designed for generating and managing data-driven surveillance reports. It integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, QuestPDF, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
+**ForeSITE Alerting Report** is a an open-source C# WPF application designed for **time-series epidemiological data analysis** and **automated alerting reports**. It enables healthcare and public health professionals to transform raw surveillance data into actionable insights with minimal setup.  This application integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Outlook. Built with C#, XAML, QuestPDF, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
 
-## Features
+## ✨ Features  
 
-- **Report Generation**: Create PDF reports with customizable titles and data-driven plots, powered by the `epySurv` module.
-- **Data Source Management**: Add, edit, and delete data sources from Providers with API integration.
-- **Plot Visualization**: Generate plots using CDC public surveillance data or user-imported datasets, with configurable parameters (e.g., data source, time range, threshold, model like Farrington).
-- **Data Import**: Import custom surveillance data (e.g., CSV, JSON) for processing with `epySurv` via the Flask API.
-- **Automated Scheduling**: Schedule monthly report generation using Windows Task Scheduler, with automatic email delivery via GMail.
-- **Rich Text Editing**: Customize report titles with rich text formatting (bold, italic, etc.).
-- **Robust Font Handling**: Fallback mechanism for fonts (Arial, Helvetica, Times New Roman) to ensure PDF compatibility across systems.
-- **Flask Backend**: Local Flask server (`http://127.0.0.1:5001/epyapi`) processes surveillance data and generates plot images.
-- **Jupyter-Like Notebook**: For advanced users, a notebook interface allows runtime data analysis with **Python** code cells and **R** code cells, supporting dynamic addition, execution, deletion, save, and load of cells.
-- **Enable Automatical Creation and Seamless Exchange on Time-Series Data**: Our objective is to facilitate the seamless interchange of datasets between R and Python 
+### 📊 Time-Series Data Integration  
+- Import and process surveillance datasets (**CSV, JSON, Web APIs**) 
+- Seamlessly interchange datasets between **R and Python** for flexible analysis.  
+- Prebuilt models (**Farrington, Bayes, Boda, CUSUM, EARS-C1**, etc.) for anomaly detection in clinical/public health data.  
+
+### 🔔 Alerting & Report Generation  
+- Automated **PDF report generation** with customizable titles and data-driven plots.  
+- Configurable parameters: data source, time range, thresholds, and models.  
+- Monthly scheduled reports with **Windows Task Scheduler** and **automatic email delivery (Gmail)**.  
+
+### 📈 Visualization  
+- Generate rich plots from **CDC public surveillance data** or user-imported datasets.  
+- Flexible configuration for baselines, thresholds, and model comparisons.  
+
+### 🔧 Data Source Management  
+- Add, edit, or delete data sources with full API integration.  
+- Supports both internal datasets and external provider APIs.  
+
+### 💻 Interactive Analysis  
+- **Notebook-like interface** for advanced users, supporting Python and R cells for runtime analysis.  
+- Dynamically add, execute, delete, save, and load analysis cells.  
+
+### 🎨 User-Friendly Customization  
+- Rich text editing for report titles (**bold, italic**, etc.).  
+- Robust font fallback (**Arial, Helvetica, Times New Roman**) ensuring PDF compatibility across systems.  
+
+### ⚙️ Backend Processing  
+- Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
 ## Changelog
 
