@@ -36,7 +36,7 @@
 ### ⚙️ Backend Processing  
 - Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
-## Changelog
+## ✨ Changelog
 
 ### Version 0.8 
 We’ve added support for Windows scheduled tasks to automate report delivery.
@@ -64,7 +64,7 @@ This means reports are sent hands-free and on time, according to your preferred 
 - Allowed users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
 
 
-## Prerequisites
+## ✨ Prerequisites
 
 - **Operating System**: Windows 10 or later
 - **.NET Framework**: .NET 8.0 or higher
