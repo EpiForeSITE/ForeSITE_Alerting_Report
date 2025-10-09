@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -21,9 +22,26 @@ namespace ForeSITETestApp
             string pythonDirectory = Path.Combine(currentDirectory, "Server");
             DatabasePath = Path.Combine(pythonDirectory, "foresite_alerting.db");
             ConnectionString = $"Data Source={DatabasePath}";
+            Debug.WriteLine($"Database path set to: {DatabasePath}");
+            LogConnectionString();
 
             // Ensure Python directory exists
             EnsurePythonDirectoryExists();
+        }
+
+        public static void LogConnectionString()
+        {
+            // Try to use MainWindow.GlobalLogWriter if available, otherwise fallback to Console/Debug
+            if (MainWindow.GlobalLogWriter != null)
+            {
+                MainWindow.GlobalLogWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [INFO] DBHelper ConnectionString: {ConnectionString}");
+            }
+            else
+            {
+                
+                Console.WriteLine($"DBHelper ConnectionString: {ConnectionString}");
+                Debug.WriteLine($"DBHelper ConnectionString: {ConnectionString}");
+            }
         }
 
         /// <summary>
@@ -66,8 +84,14 @@ namespace ForeSITETestApp
                         LastUpdated TEXT DEFAULT CURRENT_TIMESTAMP
                     )";
                 command.ExecuteNonQuery();
-
-
+                
+                command = connection.CreateCommand();
+                command.CommandText = @"Drop table modelproperties";
+                command.ExecuteNonQuery();
+                command = connection.CreateCommand();
+                command.CommandText = @"Drop table models";
+                command.ExecuteNonQuery();
+                
 
                 command = connection.CreateCommand();
                 command.CommandText = @"
@@ -96,6 +120,8 @@ namespace ForeSITETestApp
                 command.ExecuteNonQuery();
 
 
+               
+
                 // New: Create modelproperties table
                 command = connection.CreateCommand();
                 command.CommandText = @"
@@ -106,7 +132,6 @@ namespace ForeSITETestApp
                     Title TEXT,
                     Type TEXT,
                     DefaultValue TEXT,
-                    DisplayInUI INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY (modelId) REFERENCES models(Id) ON DELETE CASCADE
                 )";
                 command.ExecuteNonQuery();
@@ -168,7 +193,7 @@ namespace ForeSITETestApp
             try
             {
                 string currentDirectory = Directory.GetCurrentDirectory();
-                string jsonFilePath = Path.Combine(currentDirectory, "initial_models.json");
+                string jsonFilePath = Path.Combine(currentDirectory, "models.json");
 
                 if (!File.Exists(jsonFilePath))
                 {
@@ -233,13 +258,13 @@ namespace ForeSITETestApp
 
                                     using var command = connection.CreateCommand();
                                     command.CommandText = @"
-                                INSERT INTO modelproperties (ModelId, Name, Type, DefaultValue, DisplayInUI, Title)
-                                VALUES ($modelId, $name, $type, $defaultValue, $displayInUI, $title)";
+                                INSERT INTO modelproperties (ModelId, Name, Type, DefaultValue,  Title)
+                                VALUES ($modelId, $name, $type, $defaultValue,  $title)";
                                     command.Parameters.AddWithValue("$modelId", modelId);
                                     command.Parameters.AddWithValue("$name", prop.Name ?? "");
                                     command.Parameters.AddWithValue("$type", prop.Type ?? "");
                                     command.Parameters.AddWithValue("$defaultValue", prop.DefaultValue ?? "");
-                                    command.Parameters.AddWithValue("$displayInUI", prop.DisplayInUI ? 1 : 0);
+                                   
                                     command.Parameters.AddWithValue("$title", prop.Title ?? "");
                                     command.ExecuteNonQuery();
                                 }
@@ -483,7 +508,7 @@ namespace ForeSITETestApp
                 // 2. Read all modelproperties and assign to corresponding models
                 using var propCommand = connection.CreateCommand();
                 propCommand.CommandText = @"
-                    SELECT Id, modelId, Name, Title, Type, DefaultValue, DisplayInUI
+                    SELECT Id, modelId, Name, Title, Type, DefaultValue
                     FROM modelproperties";
                 using var propReader = propCommand.ExecuteReader();
                 while (propReader.Read())
@@ -496,8 +521,7 @@ namespace ForeSITETestApp
                             Name = propReader["Name"]?.ToString() ?? "",
                             Title = propReader["Title"]?.ToString() ?? "",
                             Type = propReader["Type"]?.ToString() ?? "",
-                            DefaultValue = propReader["DefaultValue"]?.ToString() ?? "",
-                            DisplayInUI = Convert.ToInt32(propReader["DisplayInUI"]) == 1
+                            DefaultValue = propReader["DefaultValue"]?.ToString() ?? ""
                         };
                         model.Properties.Add(prop);
                     }
@@ -795,13 +819,12 @@ namespace ForeSITETestApp
                                 UPDATE modelproperties
                                 SET Title = $title,
                                     Type = $type,
-                                    DefaultValue = $defaultValue,
-                                    DisplayInUI = $displayInUI
+                                    DefaultValue = $defaultValue
                                 WHERE Id = $id";
                             updateCmd.Parameters.AddWithValue("$title", prop.Title ?? "");
                             updateCmd.Parameters.AddWithValue("$type", prop.Type ?? "");
                             updateCmd.Parameters.AddWithValue("$defaultValue", prop.DefaultValue ?? "");
-                            updateCmd.Parameters.AddWithValue("$displayInUI", prop.DisplayInUI ? 1 : 0);
+                           
                             updateCmd.Parameters.AddWithValue("$id", propertyId);
 
                             updateCmd.ExecuteNonQuery();
@@ -811,14 +834,14 @@ namespace ForeSITETestApp
                             // Insert new property
                             using var insertCmd = connection.CreateCommand();
                             insertCmd.CommandText = @"
-                                INSERT INTO modelproperties (modelId, Name, Title, Type, DefaultValue, DisplayInUI)
-                                VALUES ($modelId, $name, $title, $type, $defaultValue, $displayInUI)";
+                                INSERT INTO modelproperties (modelId, Name, Title, Type, DefaultValue)
+                                VALUES ($modelId, $name, $title, $type, $defaultValue)";
                             insertCmd.Parameters.AddWithValue("$modelId", modelId);
                             insertCmd.Parameters.AddWithValue("$name", prop.Name ?? "");
                             insertCmd.Parameters.AddWithValue("$title", prop.Title ?? "");
                             insertCmd.Parameters.AddWithValue("$type", prop.Type ?? "");
                             insertCmd.Parameters.AddWithValue("$defaultValue", prop.DefaultValue ?? "");
-                            insertCmd.Parameters.AddWithValue("$displayInUI", prop.DisplayInUI ? 1 : 0);
+                            
 
                             insertCmd.ExecuteNonQuery();
                         }
@@ -942,7 +965,7 @@ namespace ForeSITETestApp
                 using (var propCommand = connection.CreateCommand())
                 {
                     propCommand.CommandText = @"
-                        SELECT Name, Title, Type, DefaultValue, DisplayInUI
+                        SELECT Name, Title, Type, DefaultValue
                         FROM modelproperties
                         WHERE modelId = $modelId";
                     propCommand.Parameters.AddWithValue("$modelId", modelId);
@@ -956,7 +979,7 @@ namespace ForeSITETestApp
                             Title = propReader["Title"]?.ToString() ?? "",
                             Type = propReader["Type"]?.ToString() ?? "",
                             DefaultValue = propReader["DefaultValue"]?.ToString() ?? "",
-                            DisplayInUI = Convert.ToInt32(propReader["DisplayInUI"]) == 1
+                            
                         };
                         model.Properties.Add(prop);
                     }
@@ -1063,7 +1086,7 @@ namespace ForeSITETestApp
 
                 using var command = connection.CreateCommand();
                 command.CommandText = @"
-                SELECT Id, modelId, Name, Type, DefaultValue, DisplayInUI, Title
+                SELECT Id, modelId, Name, Type, DefaultValue, Title
                 FROM modelproperties
                 WHERE modelId = $modelId";
                 command.Parameters.AddWithValue("$modelId", modelId);
@@ -1076,7 +1099,7 @@ namespace ForeSITETestApp
                         Name = reader["Name"]?.ToString() ?? "",
                         Type = reader["Type"]?.ToString() ?? "",
                         DefaultValue = reader["DefaultValue"]?.ToString() ?? "",
-                        DisplayInUI = Convert.ToInt32(reader["DisplayInUI"]) == 1,
+                       
                         Title = reader["Title"]?.ToString() ?? ""
                     });
                 }
@@ -1100,13 +1123,13 @@ namespace ForeSITETestApp
 
                 using var command = connection.CreateCommand();
                 command.CommandText = @"
-                INSERT INTO modelproperties (modelId, Name, Type, DefaultValue, DisplayInUI, Title)
-                VALUES ($modelId, $name, $type, $defaultValue, $displayInUI, $title)";
+                INSERT INTO modelproperties (modelId, Name, Type, Title)
+                VALUES ($modelId, $name, $type, $defaultValue, $title)";
                 command.Parameters.AddWithValue("$modelId", modelId);
                 command.Parameters.AddWithValue("$name", property.Name ?? "");
                 command.Parameters.AddWithValue("$type", property.Type ?? "");
                 command.Parameters.AddWithValue("$defaultValue", property.DefaultValue ?? "");
-                command.Parameters.AddWithValue("$displayInUI", property.DisplayInUI ? 1 : 0);
+               
                 command.Parameters.AddWithValue("$title", property.Title ?? "");
 
                 command.ExecuteNonQuery();
@@ -1135,13 +1158,13 @@ namespace ForeSITETestApp
                 SET Name = $name,
                     Type = $type,
                     DefaultValue = $defaultValue,
-                    DisplayInUI = $displayInUI,
+                   
                     Title = $title
                 WHERE Id = $id";
                 command.Parameters.AddWithValue("$name", property.Name ?? "");
                 command.Parameters.AddWithValue("$type", property.Type ?? "");
                 command.Parameters.AddWithValue("$defaultValue", property.DefaultValue ?? "");
-                command.Parameters.AddWithValue("$displayInUI", property.DisplayInUI ? 1 : 0);
+               
                 command.Parameters.AddWithValue("$title", property.Title ?? "");
                 command.Parameters.AddWithValue("$id", propertyId);
 

@@ -22,13 +22,16 @@ import base64
 import sqlite3
 
 import numpy as np
-from epysurv.models.timepoint import FarringtonFlexible
+
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import warnings
 import requests
 from sodapy import Socrata
+
+
+from epysurv.models.timepoint import FarringtonFlexible, EarsC1, Boda, Bayes, CDC, Cusum
 
 # Load and process config file for R environment setup
 def load_config_and_setup_r():
@@ -127,7 +130,7 @@ try:
 
 
     R_AVAILABLE = True
-    print("R support enabled successfully with rpy2 3.6.2")
+    print("R support enabled successfully with rpy2 2.9.4")
     
 except ImportError as e:
     print("R support not available due to import error:")
@@ -186,24 +189,6 @@ save_folder = os.path.join(documents_path, "ForeSITEAlertingReportFiles")
 # Ensure the directory exists and create the log file
 os.makedirs(documents_path, exist_ok=True)
 os.makedirs(save_folder, exist_ok=True)
-
-#if not os.path.exists(log_file_path):
-#    with open(log_file_path, 'a', encoding='utf-8') as f:
-#        pass  # Create an empty file
-
-# Configure logging
-#logging.basicConfig(
-#    level=logging.INFO,
-#    format='[%(asctime)s] [%(levelname)s] %(message)s',
-#    handlers=[
-#        logging.FileHandler(log_file_path, mode='a', encoding='utf-8'),
-#        logging.StreamHandler()  # Also log to console
-#    ]
-#)
-
-# Create a custom logger for R execution
-#r_logger = logging.getLogger('r_execution')
-#r_logger.setLevel(logging.INFO)
 
 # Create a custom logger for general execution
 exec_logger = logging.getLogger('code_execution')
@@ -1144,45 +1129,128 @@ def get_data_source_by_name_from_db(name):
         safe_log(f"Error retrieving data source '{name}' from database: {e}")
         return None
 
-def generate_simulation_data(start_date='2019-01-01',
-                             end_date='2021-01-05',
-                             freq='D',
-                             lam=5,
-                             outbreak_threshold=10,
-                             seed=42):
+
+
+def get_model_by_name_from_db(name):
     """
-    Generates simulated epidemiological case data.
-
-    Args:
-        start_date (str): Start date for the time series (YYYY-MM-DD).
-        end_date (str): End date for the time series (YYYY-MM-DD).
-        freq (str): Frequency of data points (pandas frequency string, e.g., 'D' for daily).
-        lam (float): Lambda parameter for the Poisson distribution (average number of cases).
-        outbreak_threshold (int): Threshold above which cases are considered part of an 'outbreak'
-                                 for the 'n_outbreak_cases' calculation.
-        seed (int): Random seed for reproducibility.
-
+    Get a specific model (and its properties) by name from the database (case-insensitive).
     Returns:
-        pandas.DataFrame: A DataFrame with dates as index and columns 'n_cases'
-                          and 'n_outbreak_cases'.
+        dict | None:
+            {
+              'id': int,
+              'name': str,
+              'full_name': str,
+              'description': str,
+              'type': str,
+              'properties': [
+                  {'name': str, 'title': str, 'type': str, 'default_value': str}
+              ]
+            }
+            or None if not found / error.
     """
-    # Set random seed for reproducibility
-    np.random.seed(seed)
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
 
-    # Create date range
-    dates = pd.date_range(start=start_date, end=end_date, freq=freq)
+            # 1) check models
+            cur.execute("""
+                SELECT Id, Name, FullName, Description, Type
+                FROM models
+                WHERE Name = ? COLLATE NOCASE
+            """, (name,))
+            row = cur.fetchone()
+            if not row:
+                return None
 
-    # Generate case counts using Poisson distribution
-    n_cases = np.random.poisson(lam=lam, size=len(dates))
-    df = pd.DataFrame({'n_cases': n_cases}, index=dates)
+            model = {
+                'id': row['Id'],
+                'name': row['Name'] or '',
+                'full_name': row['FullName'] or '',
+                'description': row['Description'] or '',
+                'type': row['Type'] or '',
+                'properties': []
+            }
 
-    # Add n_outbreak_cases column based on the threshold
-    df['n_outbreak_cases'] = df['n_cases'].apply(lambda x: max(0, x - outbreak_threshold))
+            # 2) check properties
+            cur.execute("""
+                SELECT Name, Title, Type, DefaultValue
+                FROM modelproperties
+                WHERE ModelId = ?
+                ORDER BY rowid
+            """, (model['id'],))
+            props = []
+            for p in cur.fetchall():
+                props.append({
+                    'name': p['Name'] or '',
+                    'title': p['Title'] or '',
+                    'type': p['Type'] or '',
+                    'default_value': p['DefaultValue'] or ''
+                })
+            model['properties'] = props
+            return model
 
-    safe_log(f"Generated simulation data from {start_date} to {end_date}.")
-    return df
+    except Exception as e:
+        safe_log(f"Error retrieving model '{name}' from database: {e}")
+        return None
 
-def getCdcData(resourceUri):
+
+def get_all_models_from_db():
+    """
+    Get all models with their properties.
+    Returns:
+        list[dict]: list of model dicts like get_model_by_name_from_db() returns (without filtering).
+    """
+    models = []
+    try:
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+
+            # 1) get all models
+            cur.execute("""
+                SELECT Id, Name, FullName, Description, Type
+                FROM models
+                ORDER BY Name COLLATE NOCASE
+            """)
+            rows = cur.fetchall()
+            if not rows:
+                return models
+
+            # 2) get all properties group by ModelId 
+            cur.execute("""
+                SELECT ModelId, Name, Title, Type, DefaultValue
+                FROM modelproperties
+                ORDER BY ModelId, rowid
+            """)
+            prop_rows = cur.fetchall()
+            props_by_model = {}
+            for p in prop_rows:
+                props_by_model.setdefault(p['ModelId'], []).append({
+                    'name': p['Name'] or '',
+                    'title': p['Title'] or '',
+                    'type': p['Type'] or '',
+                    'default_value': p['DefaultValue'] or ''
+                })
+
+            # 3) 
+            for r in rows:
+                mid = r['Id']
+                models.append({
+                    'id': mid,
+                    'name': r['Name'] or '',
+                    'full_name': r['FullName'] or '',
+                    'description': r['Description'] or '',
+                    'type': r['Type'] or '',
+                    'properties': props_by_model.get(mid, [])
+                })
+        return models
+
+    except Exception as e:
+        safe_log(f"Error retrieving all models from database: {e}")
+        return []
+
+def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
     """
     Author: Jasmine He
     Fetches CDC epidemiological case data from a public API.
@@ -1190,30 +1258,80 @@ def getCdcData(resourceUri):
         pandas.DataFrame: A DataFrame containing the fetched data, or None if an error occurs.
     """
     try:
-        app_token="Wa9PucgUy1cHNJgzoTZwhg9AY"
-        client = Socrata("data.cdc.gov", app_token=app_token, timeout=60)
+        #app_token="Wa9PucgUy1cHNJgzoTZwhg9AY"
+        client = Socrata(domain, app_token=app_token, timeout=timeout)
 
         all_results = []
         offset = 0
         while True:
-            results = client.get(resourceUri, limit=5000, offset=offset)
+            results = client.get(dataset_id, limit=limit, offset=offset)
             if not results:  # Break if no more data is returned
                 break
             all_results.extend(results)
-            offset += 5000  # Increment the offset for the next chunk
+            offset += limit  # Increment the offset for the next chunk
+
+        if not all_results:
+            safe_log(f"No rows returned from Socrata dataset {dataset_id} on {domain}")
+            return None
         results_df = pd.DataFrame.from_records(all_results)
         return results_df
     except requests.exceptions.RequestException as e:
         safe_log(f"Error fetching data: {e}")
         return None
 
-def get_resource_uri(datasource):
-    if datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
-        return "r8kw-7aab"
-    else:
-        return "local"
+from typing import Optional
 
-def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
+def normalize_cdc_weekly(df: pd.DataFrame, datasource: str, threshold: int = 4000) -> Optional[pd.DataFrame]:
+    if df is None or df.empty:
+        return None
+    # cleaning
+    # use mmwr_week and US 
+    try:
+        df_week = df[df["mmwr_week"] >= "1"]
+    except Exception:
+        df_week = df
+    try:
+        df_us = df_week[df_week["state"] == "United States"]
+    except Exception:
+        df_us = df_week
+
+    # choose fields by data sources
+    if datasource == "COVID-19 Deaths":
+        cols = ["start_date", "end_date", "mmwr_week", "covid_19_deaths"]
+        rename_to_cases = "covid_19_deaths"
+    elif datasource == "Pneumonia Deaths":
+        cols = ["start_date", "end_date", "mmwr_week", "pneumonia_deaths"]
+        rename_to_cases = "pneumonia_deaths"
+    elif datasource == "Flu Deaths":
+        cols = ["start_date", "end_date", "mmwr_week", "influenza_deaths"]
+        rename_to_cases = "influenza_deaths"
+    else:
+        return None
+
+    sub = df_us[[c for c in cols if c in df_us.columns]].copy()
+    if "start_date" not in sub.columns:
+        safe_log("CDC data missing 'start_date'")
+        return None
+
+    sub["start_date"] = pd.to_datetime(sub["start_date"], errors="coerce")
+    if "end_date" in sub.columns:
+        sub["end_date"] = pd.to_datetime(sub.get("end_date"), errors="coerce")
+
+    # n_cases
+    if rename_to_cases not in sub.columns:
+        safe_log(f"CDC data missing '{rename_to_cases}'")
+        return None
+    sub = sub.rename(columns={rename_to_cases: "n_cases"})
+    sub["n_cases"] = pd.to_numeric(sub["n_cases"], errors="coerce").fillna(0).astype(int)
+
+    # n_outbreak_cases
+    sub["n_outbreak_cases"] = sub["n_cases"].apply(lambda x: 0 if x <= threshold else x - threshold)
+
+    # setup index
+    sub = sub.set_index("start_date").sort_index()
+    return sub
+
+def generate_data(datasource: str = "COVID-19 Deaths", threshold: int = 4000) -> Optional[pd.DataFrame]:
     """
     Author: Jasmine He
 
@@ -1225,182 +1343,331 @@ def generate_cdc_data(datasource="COVID-19 Deaths", threshold=4000,):
         pandas.DataFrame: A DataFrame with dates as index and columns 'n_cases'
                           and 'n_outbreak_cases'.
     """
+    cfg = get_data_source_by_name_from_db(datasource)
+    if not cfg:
+        safe_log(f"Data source '{datasource}' not found in DB.")
+        return None
 
-    if get_resource_uri(datasource) == "local":
-        df2020 = pd.read_csv("local_covid_19_test_data.csv")
-        df2020['date'] = pd.to_datetime(df2020['date'])  # Ensure 'date' is datetime type
-        df2020 = df2020.set_index('date')
-        return df2020
+    is_rt = bool(cfg.get("is_realtime"))
+    data_url = (cfg.get("data_url") or "").strip()
+    resource_url = (cfg.get("resource_url") or "").strip()
+    app_token = (cfg.get("app_token") or "").strip()
+
+    # realtime using Socrata
+    if is_rt:
+        domain = data_url or "data.cdc.gov"  # if DB ==null，default value for CDC
+        dataset_id = resource_url
+        if not dataset_id:
+            safe_log("Realtime datasource missing dataset id (resource_url).")
+            return None
+
+        df = fetchData(domain, dataset_id, app_token=app_token)
+        if df is None or df.empty:
+            safe_log("No realtime data fetched.")
+            return None
+
+        # Three CDC data as App data
+        if datasource in {"COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"}:
+            cdc_df = normalize_cdc_weekly(df, datasource, threshold=threshold)
+            return cdc_df
+
+        # for other realtime data (not CDC)
+        for date_col in ["start_date", "date", "Date", "DATE"]:
+            if date_col in df.columns:
+                df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+                df = df.set_index(date_col).sort_index()
+                return df
+
+        # if not find Date column, report log error
+        safe_log("Realtime data has no recognizable date column; returning raw frame.")
+        return df
+
+    # local data (CSV)
     else:
-         cdcdf = getCdcData(resourceUri=get_resource_uri(datasource))
-         safe_log("CDC DataFrame:", cdcdf)
-         if cdcdf is not None:
-             df_week=cdcdf[cdcdf['mmwr_week']>='1']
-             df_week_us=df_week[df_week['state']=='United States']
-             if datasource == "COVID-19 Deaths":
-                   cdcdf=df_week_us[['start_date', 'end_date', 'mmwr_week',  'covid_19_deaths' ]]
-                   cdcdf = cdcdf.rename(columns={"covid_19_deaths": "n_cases"})
-             elif datasource == "Pneumonia Deaths":   
-                   cdcdf=df_week_us[['start_date', 'end_date', 'mmwr_week',  'pneumonia_deaths' ]]
-                   cdcdf = cdcdf.rename(columns={"pneumonia_deaths": "n_cases"})
-             elif datasource == "Flu Deaths":
-                   cdcdf=df_week_us[['start_date', 'end_date', 'mmwr_week',  'influenza_deaths' ]]
-                   cdcdf = cdcdf.rename(columns={"influenza_deaths": "n_cases"})        
-             else:
-                safe_log("Invalid data source provided.")
-                return None
-             # 转换为 datetime 类型
-             cdcdf["start_date"] = pd.to_datetime(cdcdf["start_date"])
-             cdcdf["end_date"] = pd.to_datetime(cdcdf["end_date"])
-             # 设置 index 为每周开始时间（推荐）
-             df = cdcdf.set_index("start_date")
-             df = cdcdf.sort_index()
-             df['n_cases'] = df['n_cases'].astype(int)
-             # 计算每周的病例数
-             df['n_outbreak_cases'] = df['n_cases'].apply(lambda x: 0 if x <= threshold else x - threshold)
-             return df
-         else:
-             safe_log("No data found for the specified data source.")
-             return None
+        # DataURL has CVS file name or path
+        filename = os.path.basename(data_url) if data_url else ""
+        if not filename.lower().endswith(".csv"):
+            safe_log(f"Local datasource expected CSV filename in DataURL, got: {data_url}")
+            return None
 
-   
- 
-    
-def run_farrington_model(df, train_split_ratio=0.8, alpha=0.05, years_back=1):
+        csv_path = os.path.join(os.getcwd(), filename)
+        if not os.path.exists(csv_path):
+            safe_log(f"CSV not found in current directory: {csv_path}")
+            return None
+
+        try:
+            df = pd.read_csv(csv_path)
+        except Exception as e:
+            safe_log(f"Failed to read CSV '{csv_path}': {e}")
+            return None
+
+        # We need a date field in CSV file
+        if "date" not in df.columns:
+            safe_log("Local CSV missing 'date' column.")
+            return None
+
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        df = df.set_index("date").sort_index()
+        return df   
+
+# --- Tools for model properties ---
+def _convert_by_type(type_str: str, raw_value: str):
+    t = (type_str or "").strip().lower()
+    v = raw_value
+    if t == "int":
+        try: return int(v)
+        except: return int(float(v)) if str(v).replace('.', '', 1).isdigit() else 0
+    if t == "float":
+        try: return float(v)
+        except: return np.nan
+    if t == "bool":
+        if isinstance(v, bool): return v
+        s = str(v).strip().lower()
+        return s in ("true", "1", "yes", "y", "t")
+    #default as  string
+    return str(v if v is not None else "")
+
+def _properties_from_db(model_name: str) -> dict:
     """
-    Trains the FarringtonFlexible model and generates predictions.
+    return {prop_name(lower-norm): coerced_value}, e.g. {'alpha':0.05, 'trend':True})}
+    """
+    cfg = get_model_by_name_from_db(model_name)
+    if not cfg:
+        raise ValueError(f"Model '{model_name}' not found in DB.")
+    props = {}
+    for p in (cfg.get("properties") or []):
+        name = (p.get("name") or "").strip()
+        ptype = p.get("type") or ""
+        dft = p.get("default_value") or ""
+        if not name:
+            continue
+        key = name.strip().lower()
+        props[key] = _convert_by_type(ptype, dft)
+    return props
+
+
+# ========== 1) data split ==========
+def split_train_test(df: pd.DataFrame,
+                     useTrainSplit: bool = True,
+                     train_split_ratio: float = 0.8,
+                     train_end_date: Optional[datetime] = None):
+    """
+    Split df into train and test using either ratio or fixed end date.
 
     Args:
-        df (pd.DataFrame): Input data with DatetimeIndex and 'n_cases' column.
-        train_split_ratio (float): Proportion of data for training.
-        alpha (float): Significance level.
-        years_back (int): Years for baseline reference.
+        df (pd.DataFrame): Must have DatetimeIndex and 'n_cases'.
+        useTrainSplit (bool): If True, split by ratio; if False, split by date.
+        train_split_ratio (float): Proportion for training (0<ratio<1), used if useTrainSplit=True.
+        train_end_date (datetime): Last date for training set, used if useTrainSplit=False.
 
     Returns:
-        df_full (pd.DataFrame): Original dataframe with expected and threshold values.
-        predictions (pd.DataFrame): Model predictions, including 'alarm' and 'upperbound'.
-        train (pd.DataFrame): Training portion of the original data.
+        (train_df, test_df)
     """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise ValueError("Input DataFrame must have a DatetimeIndex.")
     if 'n_cases' not in df.columns:
         raise ValueError("Input DataFrame must contain an 'n_cases' column.")
-    if not (0 < train_split_ratio < 1):
-        raise ValueError("train_split_ratio must be between 0 and 1 (exclusive).")
 
-    train_size = int(len(df) * train_split_ratio)
-    if train_size == 0 or train_size == len(df):
-        raise ValueError("Data size or train_split_ratio results in empty train/test set.")
+    if useTrainSplit:
+        # ratio split
+        if not (0 < train_split_ratio < 1):
+            raise ValueError("train_split_ratio must be between 0 and 1 (exclusive).")
 
-    train = df.iloc[:train_size].copy()
-    test = df.iloc[train_size:].copy()
+        train_size = int(len(df) * train_split_ratio)
+        if train_size == 0 or train_size == len(df):
+            raise ValueError("Data size or train_split_ratio results in empty train/test set.")
 
-    model = FarringtonFlexible(alpha=alpha, years_back=years_back)
-    model.fit(train)
-    predictions = model.predict(test)
+        train = df.iloc[:train_size].copy()
+        test = df.iloc[train_size:].copy()
+        safe_log(f"Splitting by ratio: {train_split_ratio}, "
+                 f"{len(train)} train, {len(test)} test")
 
-    df_full = df.copy()
-    df_full['threshold'] = np.nan
-    df_full.loc[predictions.index, 'threshold'] = predictions['upperbound']
-    df_full['expected'] = train['n_cases'].mean()
+    else:
+        # date split
+        if train_end_date is None:
+            raise ValueError("train_end_date must be provided when useTrainSplit=False.")
 
-    return df_full, predictions, train
+        train = df[df.index <= train_end_date].copy()
+        test = df[df.index > train_end_date].copy()
+        if train.empty or test.empty:
+            raise ValueError("train_end_date results in empty train or test set.")
+        safe_log(f"Splitting by date: train_end_date={train_end_date.date()}, "
+                 f"{len(train)} train, {len(test)} test")
 
-def run_farrington_model_bydatesplit(df, train_end_date, alpha=0.05, years_back=1):
+    return train, test
+# ========== 2) train and predict model, return df_full ==========
+def fit_and_predict_df_full(
+    df: pd.DataFrame,
+    useTrainSplit: bool = True,
+    train_split_ratio: float = 0.8,
+    train_end_date: Optional[datetime] = None,
+    model_name: str = "Farrington",
+    years_back: Optional[int] = None,
+    mc_munu: Optional[int] = None,
+    baseline: Optional[int] = None
+):
     """
-    Trains the FarringtonFlexible model and generates predictions.
-
-    Args:
-        df (pd.DataFrame): Input data with DatetimeIndex and 'n_cases' column.
-        train_end_date (str): End date for the training set (YYYY-MM-DD).
-        alpha (float): Significance level.
-        years_back (int): Years for baseline reference.
-
-    Returns:
-        df_full (pd.DataFrame): Original dataframe with expected and threshold values.
-        predictions (pd.DataFrame): Model predictions, including 'alarm' and 'upperbound'.
-        train (pd.DataFrame): Training portion of the original data.
+    Train the chosen model on train set and predict on test set.
+    Returns a df_full with columns: n_cases, expected, threshold(=upperbound on test), alarm(if available).
     """
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise ValueError("Input DataFrame must have a DatetimeIndex.")
-    if 'n_cases' not in df.columns:
-        raise ValueError("Input DataFrame must contain an 'n_cases' column.")
- 
-    safe_log(df.index)
-    # 用 train/test date 训练
-    train = df.loc[:train_end_date, ['n_cases', 'n_outbreak_cases']].copy()
-    test = df.loc[train_end_date:, ['n_cases', 'n_outbreak_cases']].copy()
-    safe_log(train.index)
-    safe_log("Train size:", len(train), "Test size:", len(test))
-    safe_log(test.index)
+    # 1) read DB model properties
+    db_props = _properties_from_db(model_name)   # e.g. {'alpha':0.05, 'trend':True, ...}
+    mkey = (model_name or "").strip().lower()
 
-    model = FarringtonFlexible(alpha=alpha, years_back=years_back)
-    safe_log("Fitting FarringtonFlexible model...", model)
+    # 2) make constructor kwargs
+    ctor_kwargs = {}
+
+    if mkey in ("farrington", "farringtonflexible"):
+        # Farrington arguments:
+        # alpha / window_half_width / reweight / threshold_method / weights_threshold / trend …
+        for k in ("alpha", "window_half_width", "reweight", "threshold_method", "weights_threshold", "trend"):
+            if k in db_props:
+                ctor_kwargs[k] = db_props[k]
+
+        # years_back comes from UI
+        ctor_kwargs["years_back"] = int(years_back if years_back is not None else 1)
+    elif mkey == "bayes":
+        # Bayes: alpha（from DB），others from UI
+        for k in ("alpha","window_half_width"):
+            if k in db_props:
+                ctor_kwargs[k] = db_props[k]
+        ctor_kwargs["years_back"] = int(years_back if years_back is not None else 3)
+    elif mkey == "cdc":
+        # CDC: alpha（from DB），others from UI
+        for k in ("alpha","window_half_width"):
+            if k in db_props:
+                ctor_kwargs[k] = db_props[k]
+        ctor_kwargs["years_back"] = int(years_back if years_back is not None else 5)
+
+    elif mkey == "boda":
+        # Boda: trend / season / alpha（from DB），mc_munu from UI
+        for k in ("alpha", "trend", "season"):
+            if k in db_props:
+                ctor_kwargs[k] = db_props[k]
+        
+        ctor_kwargs["mc_munu"] = int(mc_munu if mc_munu is not None else 100)
+    elif mkey == "earsc1":
+        
+        for k in ("alpha",):
+            if k in db_props:
+                ctor_kwargs[k] = db_props[k]
+        ctor_kwargs["baseline"] = int(baseline if baseline is not None else 7)
+
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    safe_log(f"[{model_name}] ctor kwargs: {ctor_kwargs}")
+
+    # 3) split data
+    train, test = split_train_test(df, useTrainSplit=useTrainSplit, train_split_ratio=train_split_ratio, train_end_date=train_end_date)
+
+    # 2) train and predict
+    mkey = (model_name or "").strip().lower()
+
+    if mkey in ("farrington", "farringtonflexible"):  
+        model = FarringtonFlexible(**ctor_kwargs)       
+        safe_log("Fitting FarringtonFlexible model...")
+       
+    elif mkey == "bayes":
+        # ---- Bayes ----
+        model = Bayes(**ctor_kwargs) 
+        safe_log("Fitting Bayes model...")
+       
+    elif mkey == "cdc":
+        # ---- CDC ----
+        model = CDC(**ctor_kwargs) 
+        safe_log("Fitting CDC model...")
+       
+    elif mkey == "boda":
+        # ---- Boda ----
+        model = Boda(**ctor_kwargs) 
+        safe_log(f"Fitting BODA (mc_munu={mc_munu}) ...")
+       
+
+    elif mkey == "earsc1":
+        # ---- EarsC1 ----
+        model=EarsC1(**ctor_kwargs)
+       
+        safe_log(f"Fitting EarsC1 (baseline={baseline}) ...")
+       
+
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+
+    # 拟合与预测
+    safe_log(f"Fitting {model_name} ...")
     model.fit(train)
     safe_log("Model fitting complete.")
+
+    safe_log("Making predictions ...")
     predictions = model.predict(test)
-    safe_log("Predictions:", predictions)
-  
+    safe_log("Predictions complete.")
+
+
+    # 5) 组装 df_full（沿用你原先行为）
     df_full = df.copy()
     df_full['threshold'] = np.nan
-    df_full.loc[predictions.index, 'threshold'] = predictions['upperbound']
-    df_full['expected'] = train['n_cases'].mean()
-    safe_log(df_full)
+    if predictions is not None and not predictions.empty and "upperbound" in predictions.columns:
+        common_index = predictions.index.intersection(df_full.index)
+        df_full.loc[common_index, "threshold"] = predictions.loc[common_index, "upperbound"]
+    else:
+        safe_log("Predictions missing 'upperbound'; threshold remains NaN.")
 
-    return df_full, predictions, train
+    expected_value = train["n_cases"].mean() if not train.empty else np.nan
+    df_full["expected"] = expected_value
 
+    return df_full, predictions
 
-def plot_farrington_results(df_full,
-                            predictions,
-                            train,
-                            save_path,
-                            alpha=0.05,
-                            plot_title='FarringtonFlexible Model: Case Detection Plot',
-                            xlabel='Date',
-                            ylabel='Number of Cases'):
+# ========== 3) 绘图 ==========
+def plot_detection_df_full(
+    df_full: pd.DataFrame,
+    save_path: str,
+    predictions: Optional[pd.DataFrame] = None,
+    plot_title: str = 'Outbreak Detection Plot',
+    xlabel: str = 'Date',
+    ylabel: str = 'Number of Cases',
+    alpha: float = 0.05
+):
     """
-    Generates and saves a plot based on the output of the FarringtonFlexible model.
-
-    Args:
-        df_full (pd.DataFrame): Full dataset with 'n_cases', 'expected', and 'threshold'.
-        predictions (pd.DataFrame): Prediction output with 'upperbound' and optionally 'alarm'.
-        train (pd.DataFrame): The training set used for computing expectations.
-        save_path (str): File path for saving the plot image.
-        alpha (float): Significance level for labeling.
-        plot_title (str): Title of the plot.
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-
-    Returns:
-        None
+    Build figure from df_full (expects columns: n_cases, expected, threshold) and optional predictions(alarm).
+    Save to save_path.
     """
-    expected_value = train['n_cases'].mean()
+    if not isinstance(df_full.index, pd.DatetimeIndex):
+        raise ValueError("df_full must have a DatetimeIndex.")
+    for col in ('n_cases', 'expected', 'threshold'):
+        if col not in df_full.columns:
+            raise ValueError(f"df_full missing required column: {col}")
+
     plt.figure(figsize=(12, 6))
 
-    # Actual cases
-    plt.plot(df_full.index, df_full['n_cases'], label='Actual Cases', color='blue', marker='o', markersize=4, linestyle='-')
+    # Actual
+    plt.plot(df_full.index, df_full['n_cases'],
+             label='Actual Cases', marker='o', markersize=4, linestyle='-')
 
     # Expected
-    plt.plot(df_full.index, df_full['expected'], label=f'Expected Cases (Train Mean = {expected_value:.2f})', color='green', linestyle='--')
+    expected_value = df_full['expected'].iloc[0] if not df_full.empty else np.nan
+    plt.plot(df_full.index, df_full['expected'],
+             label=f'Expected Cases (Train Mean = {expected_value:.2f})', linestyle='--')
 
     # Threshold
-    plt.plot(df_full.index, df_full['threshold'], label=f'Threshold (alpha={alpha})', color='red', linestyle='--')
+    plt.plot(df_full.index, df_full['threshold'],
+             label=f'Threshold (alpha={alpha})', linestyle='--')
 
-    # Alert zone
+    # Fill alert zone
     fill_indices = df_full['threshold'].dropna().index
     if not fill_indices.empty:
-        plt.fill_between(fill_indices,
-                         df_full.loc[fill_indices, 'expected'],
-                         df_full.loc[fill_indices, 'threshold'],
-                         where=df_full.loc[fill_indices, 'threshold'] >= df_full.loc[fill_indices, 'expected'],
-                         color='red', alpha=0.1, label='Alert Zone')
+        exp_fill = df_full.loc[fill_indices, 'expected']
+        thr_fill = df_full.loc[fill_indices, 'threshold']
+        plt.fill_between(fill_indices, exp_fill, thr_fill,
+                         where=thr_fill >= exp_fill, alpha=0.1, label='Alert Zone')
 
-    # Alarms
-    if 'alarm' in predictions.columns:
+    # Alarms (if provided)
+    if predictions is not None and 'alarm' in predictions.columns:
         alarm_indices = predictions[predictions['alarm']].index
         outliers = df_full.loc[alarm_indices]
         if not outliers.empty:
-            plt.scatter(outliers.index, outliers['n_cases'], color='purple', label='Alarms', zorder=5, s=50)
+            plt.scatter(outliers.index, outliers['n_cases'],
+                        label='Alarms', zorder=5, s=50)
 
     # Decorations
     plt.legend()
@@ -1410,143 +1677,19 @@ def plot_farrington_results(df_full,
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
 
-    save_dir = os.path.dirname(save_path)
-    if save_dir and not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    try:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        safe_log(f"Plot saved to: {save_path}")
-    except Exception as e:
-        safe_log(f"Failed to save plot: {e}")
-    finally:
-        plt.close()
-
-def generate_plot_from_data(df,
-                            save_path,
-                            train_split_ratio=0.8,
-                            alpha=0.05,
-                            years_back=1,
-                            plot_title='FarringtonFlexible Model: Case Detection Plot',
-                            xlabel='Date',
-                            ylabel='Number of Cases'):
-    """
-    Trains a FarringtonFlexible model on the provided data, makes predictions,
-    and generates a plot visualizing the results, saving it to a file.
-
-    Args:
-        df (pandas.DataFrame): DataFrame containing the time series data.
-                               Must have a DateTimeIndex and a column named 'n_cases'.
-        save_path (str): The full path (including filename and extension, e.g., .png)
-                         where the plot image will be saved.
-        train_split_ratio (float): Proportion of the data to use for training (0 to 1).
-        alpha (float): Significance level for the Farrington model's threshold calculation.
-        years_back (int): Number of previous years' data to consider for the baseline
-                          in the Farrington model.
-        plot_title (str): Title for the generated plot.
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-
-    Returns:
-        None: The function saves the plot to the specified file path.
-    """
-    if not isinstance(df.index, pd.DatetimeIndex):
-        raise ValueError("Input DataFrame must have a DatetimeIndex.")
-    if 'n_cases' not in df.columns:
-        raise ValueError("Input DataFrame must contain an 'n_cases' column.")
-    if not (0 < train_split_ratio < 1):
-        raise ValueError("train_split_ratio must be between 0 and 1 (exclusive).")
-
-    # Split training and testing data
-    train_size = int(len(df) * train_split_ratio)
-    if train_size == 0 or train_size == len(df):
-        raise ValueError("Data size or train_split_ratio results in an empty train or test set.")
-
-    train = df.iloc[:train_size].copy()
-    test = df.iloc[train_size:].copy()
-
-    safe_log(f"Splitting data: {len(train)} training points, {len(test)} testing points.")
-
-    # Initialize and fit the FarringtonFlexible model
-    
-
-
-    model = FarringtonFlexible(alpha=alpha, years_back=years_back)
-    safe_log("Fitting FarringtonFlexible model...")
-    model.fit(train)
-    safe_log("Model fitting complete.")
-
-    # Predict on the test set
-    safe_log("Making predictions...")
-    predictions = model.predict(test)
-    safe_log("Predictions complete.")
-    # print("Prediction Columns:", predictions.columns) # Optional: for debugging
-
-    # Prepare data for visualization
-    df_full = df.copy()
-
-    # Add threshold column - only for the test period where predictions exist
-    df_full['threshold'] = np.nan # Initialize with NaN
-    # Align prediction index with df_full index before assigning
-    common_index = predictions.index.intersection(df_full.index)
-    df_full.loc[common_index, 'threshold'] = predictions.loc[common_index, 'upperbound']
-
-    # Approximate expected cases using the mean of the training data
-    expected_value = train['n_cases'].mean()
-    df_full['expected'] = expected_value # Apply to the whole series for plotting continuity
-
-    # Visualization
-    plt.figure(figsize=(12, 6))
-
-    # Plot actual cases
-    plt.plot(df_full.index, df_full['n_cases'], label='Actual Cases', color='blue', marker='o', markersize=4, linestyle='-')
-
-    # Plot expected cases
-    plt.plot(df_full.index, df_full['expected'], label=f'Expected Cases (Train Mean = {expected_value:.2f})', color='green', linestyle='--')
-
-    # Plot threshold line (only where it exists - test period)
-    plt.plot(df_full.index, df_full['threshold'], label=f'Threshold (alpha={alpha})', color='red', linestyle='--')
-
-    # Fill the alert zone (between expected and threshold, only in the test period)
-    # Ensure we only fill where threshold is not NaN
-    fill_indices = df_full['threshold'].dropna().index
-    if not fill_indices.empty:
-         # Ensure 'expected' values are available for these indices
-        expected_for_fill = df_full.loc[fill_indices, 'expected']
-        threshold_for_fill = df_full.loc[fill_indices, 'threshold']
-        plt.fill_between(fill_indices, expected_for_fill, threshold_for_fill,
-                         where=threshold_for_fill >= expected_for_fill, # Only fill where threshold > expected
-                         color='red', alpha=0.1, label='Alert Zone')
-
-    # Highlight outliers/alarms found in the prediction period
-    if 'alarm' in predictions.columns:
-        alarm_indices = predictions[predictions['alarm']].index
-        outliers = df_full.loc[alarm_indices]
-        if not outliers.empty:
-            plt.scatter(outliers.index, outliers['n_cases'], color='purple', label='Alarms', zorder=5, s=50) # Increased size
-
-    # Add plot elements
-    plt.legend()
-    plt.title(plot_title, fontsize=14)
-    plt.xlabel(xlabel, fontsize=12)
-    plt.ylabel(ylabel, fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.tight_layout()
-
-    # Ensure the save directory exists
+    # Save
     save_dir = os.path.dirname(save_path)
     if save_dir and not os.path.exists(save_dir):
         os.makedirs(save_dir)
         safe_log(f"Created directory: {save_dir}")
-
-    # Save the plot
     try:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         safe_log(f"Plot saved successfully to: {save_path}")
     except Exception as e:
         safe_log(f"Error saving plot to {save_path}: {e}")
     finally:
-        plt.close() # Close the plot to free memory
+        plt.close()
+
 
 
 @app.route('/epyapi', methods=['POST'])
@@ -1585,16 +1728,35 @@ def process_json():
     try:
         graph = received_data["graph"]
         safe_log(f"Graph type: {graph}")
-        model = graph.get("model", "farrington")
+
+        model = graph.get("model", "Farrington")
         datasource = graph.get("dataSource", "Covid-19 Deaths")
-        title = graph.get("title", "Farrington Outbreak Detection Simulation")
-        yearback = int(graph.get("yearBack", 3))
+        title = graph.get("title", f"{model} Outbreak Detection Simulation")
+
         useTrainSplit = graph.get("useTrainSplit", False)
         threshold = int(graph.get("threshold", 1500))
         trainSplitRatio = float(graph.get("trainSplitRatio", 0.70))
         train_end_date = datetime(2024, 12, 31)
 
-        safe_log(f"model: {model}, dataSource: {datasource}, title: {title}, yearBack: {yearback}, \
+        # Base on model, get other parameters
+        yearback = None
+        mc_munu = None
+        baseline = None
+
+        mkey = model.strip().lower()
+        if mkey in ("farrington", "bayes", "cdc"):
+            yearback = int(graph.get("yearBack", 3))
+        elif mkey == "boda":
+            mc_munu = int(graph.get("mc_munu", 100))
+        elif mkey == "earsc1":
+            baseline = int(graph.get("baseline", 7))
+
+        # 打印/调试
+        safe_log(f"Model={model}, DataSource={datasource}, title: {title},"
+                   f"yearBack={yearback}, mc_munu={mc_munu}, baseline={baseline}")
+
+
+        safe_log(f"model: {model},  \
                 useTrainSplit: {useTrainSplit}, threshold: {threshold}, trainSplitRatio: {trainSplitRatio}")
 
         if not useTrainSplit:
@@ -1606,204 +1768,40 @@ def process_json():
         safe_log(f"Parameter error: {e}")
         abort(400, description=f"Invalid parameters: {e}")
 
+
     import uuid
 
     unique_id = uuid.uuid4().hex[:8]
 
     # 6. generate unique output plot path
-    output_plot_path = (f"farrington_plot_{unique_id}.png")
+    output_plot_path = (f"{model}_plot_{unique_id}.png")
     safe_log(f"Output plot path: {output_plot_path}")
 
-    save_img = os.path.join(save_folder, output_plot_path) 
+    save_img_path = os.path.join(save_folder, output_plot_path)
+
+    # 7. 根据数据源处理数据
     try:
-        # 7. 根据数据源处理数据
-        safe_log(datasource)
-        if datasource == "COVID-19 Tests":
-            safe_log("Using local data source for COVID-19 test data.")
-            safe_log("Current working directory:", os.getcwd())
-            df2020 = pd.read_csv("local_covid_19_test_data.csv")
-            df2020['date'] = pd.to_datetime(df2020['date'])  # Ensure 'date' is datetime type
-            df2020 = df2020.set_index('date')
-            #print(df2020)
-            generate_plot_from_data(
-                df=df2020,
-                save_path=save_img,
-                train_split_ratio=trainSplitRatio,
-                alpha=0.05,
-                years_back=yearback,
-                plot_title=title
-            )
-        elif datasource in ["COVID-19 Deaths", "Pneumonia Deaths", "Flu Deaths"]:
-        # 7. 获取数据
-            safe_log(datasource)
-            try:
-               cdc_data = generate_cdc_data(datasource, threshold=threshold)
-               # Create a complete date range (daily frequency)
-              
-               cdc_data['start_date'] = pd.to_datetime(cdc_data['start_date'])  # Ensure 'date' is datetime type
-               cdc_data = cdc_data.set_index('start_date')
-               cdc_data.index = pd.date_range(start=cdc_data.index[0], periods=len(cdc_data), freq='W-SUN')
-
-               
-               safe_log(cdc_data)
-               safe_log(cdc_data.index)
         
-            except Exception as e:
-               safe_log(f"Data generation failed: {e}")
-               abort(500, description="Data generation failed.")
-
-            if useTrainSplit:
-                df_full, predictions, train = run_farrington_model(
-                    cdc_data,
-                    train_split_ratio=trainSplitRatio,
-                    alpha=0.05,
-                    years_back=yearback
-                )
-            else:
-                
-                df_full, predictions, train = run_farrington_model_bydatesplit(
-                    cdc_data,
-                    train_end_date=train_end_date.strftime("%Y-%m-%d"),
-                    alpha=0.05,
-                    years_back=yearback
-                )
-
-            plot_farrington_results(
-                df_full, predictions, train,
-                save_path=save_img,
-                alpha=0.05,
-                plot_title=title,
-                xlabel='Date',
-                ylabel='Number of Cases'
-            )
-        else:
-            # Check database for custom data source
-            safe_log(f"Looking up custom data source '{datasource}' in database...")
-            db_datasource = get_data_source_by_name_from_db(datasource)
-            
-            if db_datasource:
-                safe_log(f"Found data source in database: {db_datasource}")
-                
-                # Get the DataURL from database
-                data_url = db_datasource.get('data_url', '')
-                
-                if not data_url:
-                    raise ValueError(f"Data source '{datasource}' found in database but has no DataURL")
-                
-                safe_log(f"Loading CSV data from: {data_url}")
-                
-                # Check if it's a local file path or URL
-                if os.path.isfile(data_url):
-                    # Local file
-                    safe_log(f"Loading local CSV file: {data_url}")
-                    custom_data = pd.read_csv(data_url)
-                elif data_url.startswith(('http://', 'https://')):
-                    # Remote URL
-                    safe_log(f"Loading CSV from URL: {data_url}")
-                    custom_data = pd.read_csv(data_url)
-                else:
-                    # Try as relative path
-                    safe_log(f"Trying as relative path: {data_url}")
-                    if os.path.isfile(data_url):
-                        custom_data = pd.read_csv(data_url)
-                    else:
-                        raise FileNotFoundError(f"CSV file not found: {data_url}")
-                
-                # Process the loaded data
-                safe_log(f"Loaded CSV data with shape: {custom_data.shape}")
-                safe_log(f"Columns: {custom_data.columns.tolist()}")
-
-                
-                
-                # Try to identify date and case columns
-                date_column = None
-                case_column = None
-                
-                # Look for common date column names
-                for col in custom_data.columns:
-                    if col.lower() in ['date', 'dates', 'time', 'timestamp', 'start_date']:
-                        date_column = col
-                        break
-                
-                # Look for common case column names
-                for col in custom_data.columns:
-                    if col.lower() in ['cases', 'n_cases', 'count', 'value', 'deaths', 'cases_count']:
-                        case_column = col
-                        break
-                
-                if not date_column:
-                    # Use first column as date
-                    date_column = custom_data.columns[0]
-                    safe_log(f"No date column found, using first column as date: {date_column}")
-                
-                if not case_column:
-                    # Use second column as cases, or first numeric column
-                    numeric_cols = custom_data.select_dtypes(include=[np.number]).columns
-                    if len(numeric_cols) > 0:
-                        case_column = numeric_cols[0]
-                    else:
-                        case_column = custom_data.columns[1] if len(custom_data.columns) > 1 else custom_data.columns[0]
-                    safe_log(f"No case column found, using: {case_column}")
-                
-                # Process the data
-                try:
-                    custom_data[date_column] = pd.to_datetime(custom_data[date_column])
-                    custom_data = custom_data.set_index(date_column)
-                    
-                    # Rename case column to standard name
-                    if case_column != 'n_cases':
-                        custom_data = custom_data.rename(columns={case_column: 'n_cases'})
-                    
-                    # Ensure n_cases is numeric
-                    custom_data['n_cases'] = pd.to_numeric(custom_data['n_cases'], errors='coerce')
-                    
-                    # Add outbreak cases column
-                    custom_data['n_outbreak_cases'] = custom_data['n_cases'].apply(
-                        lambda x: max(0, x - threshold) if pd.notna(x) else 0
-                    )
-                    
-                    # Remove any rows with NaN values
-                    custom_data = custom_data.dropna(subset=['n_cases'])
-                    
-                    safe_log(f"Processed data shape: {custom_data.shape}")
-                    safe_log(f"Date range: {custom_data.index.min()} to {custom_data.index.max()}")
-                    safe_log(f"Case range: {custom_data['n_cases'].min()} to {custom_data['n_cases'].max()}")
-                    
-                except Exception as e:
-                    safe_log(f"Error processing CSV data: {e}")
-                    raise ValueError(f"Failed to process CSV data from '{data_url}': {str(e)}")
-                
-                # Generate plot using the custom data
-                if useTrainSplit:
-                    df_full, predictions, train = run_farrington_model(
-                        custom_data,
+        safe_log(datasource)
+        df = generate_data(datasource, threshold=threshold)
+        df_full, predictions = fit_and_predict_df_full(
+                        df=df,
                         train_split_ratio=trainSplitRatio,
-                        alpha=0.05,
-                        years_back=yearback
-                    )
-                else:
-                    df_full, predictions, train = run_farrington_model_bydatesplit(
-                        custom_data,
-                        train_end_date=train_end_date.strftime("%Y-%m-%d"),
-                        alpha=0.05,
-                        years_back=yearback
-                    )
+                        model_name=model,
+                        years_back=yearback,
+                        mc_munu=mc_munu,
+                        baseline=baseline
+                   )
 
-                plot_farrington_results(
-                    df_full, predictions, train,
-                    save_path=save_img,
-                    alpha=0.05,
-                    plot_title=title,
-                    xlabel='Date',
-                    ylabel='Number of Cases'
-                )
-                
-            else:
-                # Data source not found in database
-                error_msg = f"Data source '{datasource}' not found in known sources or database"
-                safe_log(error_msg)
-                abort(400, description=error_msg)
-
+        plot_detection_df_full(
+                  df_full=df_full,
+                  predictions=predictions,
+                  save_path=save_img_path,
+                  plot_title=title,
+                  xlabel='Date',
+                  ylabel='Number of Cases',
+                  alpha=0.05
+         )
     except Exception as e:
         safe_log(f"Plot generation error: {e}")
         abort(500, description=f"Plot generation failed: {e}")
@@ -1813,7 +1811,7 @@ def process_json():
     response_data.update({
         'status': 'processed',
         'message': 'Plot generated successfully.',
-        'plot_path':  save_img,
+        'plot_path':  save_img_path,
 
     })
 
@@ -2243,6 +2241,7 @@ def health_check():
     Health check endpoint for monitoring the server status.
     Returns a simple JSON response.
     """
+    print("Health check requested")
     return jsonify({
         "status": "ok",
         "message": "epyflaServer is running",
@@ -2321,7 +2320,7 @@ if __name__ == '__main__':
          # Run the app:
          # host='127.0.0.1' ensures it only listens on the loopback interface.
          # ssl_context enables HTTPS.
-         app.run(host='127.0.0.1', port=PORT, debug=True, use_reloader=False)
+         app.run(host='127.0.0.1', port=PORT, debug=False, use_reloader=False)
     except ImportError:
          safe_log("Error: 'cryptography' library not found.")
          safe_log("Please install it for ad-hoc SSL certificate generation:")

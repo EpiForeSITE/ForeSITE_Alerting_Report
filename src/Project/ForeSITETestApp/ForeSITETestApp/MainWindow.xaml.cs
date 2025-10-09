@@ -29,13 +29,13 @@ public partial class MainWindow : Window
     private Process? flaskProcess; // Declared as nullable to fix CS8618
     private readonly HttpClient _httpClient;
     private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
-    private readonly string connectionString = "Data Source=mydb.sqlite";
+    public static StreamWriter? GlobalLogWriter;
     public MainWindow()
     {
         InitializeComponent();
         DBHelper.InitializeDatabase();
 
-        // HTTP不需要SSL处理器
+        //Our HTTP doesn't need SSL certificate validation
         _httpClient = new HttpClient()
         {
             BaseAddress = new Uri(SERVER_BASE_URL),
@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         this.MainContent.Content = this.dashboard;
 
     }
-    // 端口是否被占用（快速探测）
+    // check Port is in use
     private async Task<bool> IsPortInUseAsync(int port, string host = "127.0.0.1")
     {
         try
@@ -58,13 +58,13 @@ public partial class MainWindow : Window
             using var client = new TcpClient();
             var connectTask = client.ConnectAsync(host, port);
             var completed = await Task.WhenAny(connectTask, Task.Delay(800));
-            if (completed != connectTask) return false; // 超时当不占用
+            if (completed != connectTask) return false; // time out means not connected
             return client.Connected;
         }
         catch { return false; }
     }
 
-    // 等待端口关闭（直到超时）
+    // Wait for port to be closed with timeout
     private async Task<bool> WaitPortClosedAsync(int port, int timeoutSeconds = 8)
     {
         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
@@ -76,7 +76,7 @@ public partial class MainWindow : Window
         return !await IsPortInUseAsync(port);
     }
 
-    // 强制终止占用端口的进程（Windows：netstat -ano | findstr :{port}）
+    // force to terminate process（Windows：netstat -ano | findstr :{port}）
     private async Task KillProcessOnPortAsync(int port)
     {
         try
@@ -109,21 +109,21 @@ public partial class MainWindow : Window
                     var proc = Process.GetProcessById(pid);
                     proc.Kill(entireProcessTree: true);
                 }
-                catch { /* 已退出或无权限，忽略 */ }
+                catch { /* ignore */ }
             }
 
             await WaitPortClosedAsync(port, timeoutSeconds: 8);
         }
-        catch { /* 忽略异常 */ }
+        catch { /* ignore */ }
     }
 
-    // 优雅关停（POST /shutdown），失败不抛，返回端口是否已关闭
+    // POST /shutdown gracefully within timeout to avoid exceptions, return whether port is closed
     private async Task<bool> TryGracefulShutdownAsync(string baseUrl, int port)
     {
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // 短超时
-                                                                                  // _httpClient 建议已设置 BaseAddress=SERVER_BASE_URL；若没有，用绝对 URL：
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // 
+                                                                                  
             if (_httpClient?.BaseAddress == null)
                 await new HttpClient().PostAsync($"{baseUrl.TrimEnd('/')}/shutdown", null, cts.Token);
             else
@@ -131,10 +131,10 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // 忽略：可能服务未响应/未开
+            // ignore exceptions, likely due to server already shutting down
         }
 
-        // 给它一点时间优雅退出
+        // give it some time to close the port
         return await WaitPortClosedAsync(port, timeoutSeconds: 8);
     }
 
@@ -264,10 +264,10 @@ public partial class MainWindow : Window
 
     private async Task StartFlaskAndSendRequestAsync()
     {
-        // 若是本地 127.0.0.1:5001，先优雅关停，再强杀兜底，然后再启动
+        //  if in use, gracely shutdown, then kill, restart to avoid port conflict
         try
         {
-            var baseUrl = _httpClient?.BaseAddress?.ToString() ?? SERVER_BASE_URL; // 取你项目中的配置
+            var baseUrl = _httpClient?.BaseAddress?.ToString() ?? SERVER_BASE_URL; // 
             if (!string.IsNullOrEmpty(baseUrl) &&
                 baseUrl.StartsWith("http://127.0.0.1:5001", StringComparison.OrdinalIgnoreCase))
             {
@@ -285,7 +285,7 @@ public partial class MainWindow : Window
                 }
             }
         }
-        catch { /* 忽略异常，继续启动 */ }
+        catch { /* ignore */ }
 
 
 
@@ -335,7 +335,7 @@ public partial class MainWindow : Window
         {
             // Ensure the directory exists before creating the log file
             Directory.CreateDirectory(Path.GetDirectoryName(logPath) ?? documentsPath);
-            File.Create(logPath).Close(); // 创建空文件
+            File.Create(logPath).Close(); // 
         }
 
         // Configure R environment variables
@@ -409,14 +409,14 @@ public partial class MainWindow : Window
         }
 
         using (flaskProcess = new Process { StartInfo = start })
-        using (StreamWriter logWriter = new StreamWriter(logPath, append: true))
         {
-            logWriter.AutoFlush = true;
+            GlobalLogWriter = new StreamWriter(logPath, append: true);
+            GlobalLogWriter.AutoFlush = true;
 
             flaskProcess.EnableRaisingEvents = true;
             flaskProcess.Exited += (s, e) =>
             {
-                logWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] ❌ Flask process exited unexpectedly.");
+                GlobalLogWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] ❌ Flask process exited unexpectedly.");
                 Debug.WriteLine("❌ Flask process exited unexpectedly.");
             };
 
@@ -429,22 +429,17 @@ public partial class MainWindow : Window
                 string? errLine;
                 while ((errLine = await errReader.ReadLineAsync()) != null)
                 {
-                    logWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [ERROR] {errLine}");
+                    GlobalLogWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [ERROR] {errLine}");
                 }
             });
 
             // Read standard output and write to log
             using var reader = flaskProcess.StandardOutput;
             string? output;
-
-           
-
-
             while ((output = await reader.ReadLineAsync()) != null)
             {
-                logWriter.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [INFO] {output}");
+                GlobalLogWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [INFO] {output}");
 
-                // Print startup success message to console
                 if (output.Contains("Running on http://127.0.0.1:5001/"))
                 {
                     Debug.WriteLine("✅ Flask started successfully.");
@@ -452,7 +447,8 @@ public partial class MainWindow : Window
                 }
             }
 
-
+            GlobalLogWriter?.Dispose();
+            GlobalLogWriter = null;
         }
     }
 

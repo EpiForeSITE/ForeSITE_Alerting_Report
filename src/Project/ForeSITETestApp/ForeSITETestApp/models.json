@@ -1,0 +1,132 @@
+{
+  "InitialModels": [
+    {
+      "Name": "Farrington",
+      "FullName": "epysurv.models.timepoint.farrington.FarringtonFlexible",
+      "Description": "Improved Farrington algorithm with flexible baseline period selection and enhanced reweighting procedures. Enhanced quasi-Poisson regression method for outbreak detection with better handling of overdispersion.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "window_half_width",
+          "Title": "Window Half Width",
+          "Type": "int",
+          "DefaultValue": "3"
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.01"
+        },
+        {
+          "Name": "reweight",
+          "Title": "Reweight",
+          "Type": "bool",
+          "DefaultValue": "true"
+        },
+        {
+          "Name": "threshold_method",
+          "Title": "Threshold Method",
+          "Type": "string",
+          "DefaultValue": "delta"
+        },
+        {
+          "Name": "weights_threshold",
+          "Title": "Weights Threshold",
+          "Type": "float",
+          "DefaultValue": "2.58"
+        },
+        {
+          "Name": "trend",
+          "Title": "Include Trend",
+          "Type": "bool",
+          "DefaultValue": "true"
+        }
+      ]
+    },
+    {
+      "Name": "EarsC1",
+      "FullName": "epysurv.models.timepoint.ears.EarsC1",
+      "Description": "The C1 method uses the mean and standard deviation of the previous 7 days to calculate a threshold for the current day. An alarm is triggered if the count for the current day exceeds this threshold.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.001"
+        }
+      ]
+    },
+    {
+      "Name": "Boda",
+      "FullName": "epysurv.models.timepoint.boda.Boda",
+      "Description": "A Bayesian hierarchical model for outbreak detection that accounts for temporal trends and seasonality. It uses Integrated Nested Laplace Approximations (INLA) for efficient Bayesian inference.",
+      "Type": "Python",
+      "Properties": [
+
+        {
+          "Name": "trend",
+          "Title": "Include Trend",
+          "Type": "bool",
+          "DefaultValue": "true"
+        },
+        {
+          "Name": "season",
+          "Title": "Include Seasonality",
+          "Type": "bool",
+          "DefaultValue": "true"
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.05"
+        }
+      ]
+    },
+
+    {
+      "Name": "Bayes",
+      "FullName": "epysurv.models.timepoint.bayes.Bayes",
+      "Description": "Evaluation of timepoints with the Bayes subsystem.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "window_half_width",
+          "Title": "Window Half Width",
+          "Type": "int",
+          "DefaultValue": "6"
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.05"
+        }
+      ]
+    },
+
+    {
+      "Name": "CDC",
+      "FullName": "epysurv.models.timepoint.cdc.CDC",
+      "Description": "Detection of aberrations in the occurence of notifiable diseases surveillance data.",
+      "Type": "Python",
+      "Properties": [
+        {
+          "Name": "window_half_width",
+          "Title": "Window Half Width",
+          "Type": "int",
+          "DefaultValue": "6"
+        },
+        {
+          "Name": "alpha",
+          "Title": "Alpha",
+          "Type": "float",
+          "DefaultValue": "0.05"
+        }
+      ]
+    }
+  ]
+
+}

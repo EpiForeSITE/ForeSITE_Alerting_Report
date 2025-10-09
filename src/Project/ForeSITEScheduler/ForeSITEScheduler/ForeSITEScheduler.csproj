@@ -29,10 +29,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Server\Models\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="MailKit" Version="4.13.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.6" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

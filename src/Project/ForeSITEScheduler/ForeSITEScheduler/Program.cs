@@ -10,6 +10,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -21,8 +22,7 @@ using static System.Console;
 internal static class Program
 {
     // ================== configration ==================
-    private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
-    private const int SERVER_PORT = 5001;
+    
 
     
     private static readonly string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -33,10 +33,39 @@ internal static class Program
     private static string PythonExe = Path.Combine(BaseDir, @"epysurv311\python.exe");
     private static string ServerScript = Path.Combine(ServerDir, "epyflaServer.py");
     private static string R_HOME = Path.Combine(BaseDir, @"epysurv311\Lib\R");
-    private static string FullCommand = ""; 
+    private static string FullCommand = "";
 
-    private static readonly HttpClient Http = new HttpClient { BaseAddress = new Uri(SERVER_BASE_URL), Timeout = TimeSpan.FromSeconds(60) };
+    private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
+    private const int SERVER_PORT = 5001;
+
+    
+    private static HttpClient CreateHttpClient()
+    {
+        var handler = new HttpClientHandler
+        {
+            UseProxy = false,   //  disabled proxy
+            Proxy = null
+        };
+
+        return new HttpClient(handler)
+        {
+            BaseAddress = new Uri(SERVER_BASE_URL),
+     //#if DEBUG
+            Timeout = Timeout.InfiniteTimeSpan,    // Debug 时：不超时
+     //#else
+     //       Timeout = TimeSpan.FromSeconds(15),    // Release：合理超时
+     //#endif
+        };
+    }
+
+    private static readonly HttpClient Http = CreateHttpClient();
+
+
     private static Process? FlaskProcess;
+
+    enum DocItemType { Text, Image }
+    record DocItem(DocItemType Type, string? Text = null, bool Center = false, byte[]? ImageBytes = null);
+
 
     // ================== Entry ==================
     private static async Task<int> Main(string[] args)
@@ -56,6 +85,7 @@ internal static class Program
 
         try
         {
+            Console.WriteLine($"configfile= {configPath}");
             if (File.Exists(configPath))
             {
                 string jsonContent = File.ReadAllText(configPath);
@@ -156,6 +186,7 @@ internal static class Program
                     if (recipients.Count > 0)
                     {
                         var smtp = SmtpConfig.LoadSmtpConfig();
+                        Console.WriteLine($"  Using SMTP server: {smtp.Host}:{smtp.Port}, SSL={smtp.EnableSsl}, User={smtp.Username}");
                         string subject = $"Automated Report - {DateTime.Now:yyyy-MM-dd}";
                         string body = "Please find the attached report.\n\n(This email was sent automatically.)";
 
@@ -181,7 +212,32 @@ internal static class Program
             WriteLine($"FATAL: {ex}");
             return 1;
         }
+
+        finally
+        {
+            //#if DEBUG
+            // Debug convenience: always pause
+            PauseIfInteractive(force: true);
+//#else
+//        PauseIfInteractive(force: force );
+//#endif
+        }
     }
+
+    private static void PauseIfInteractive(bool force = false, string? message = null)
+    {
+        // when force=true, always pause
+        if (!force)
+        {
+            if (!Environment.UserInteractive) return;        // non-interactive session
+            if (Console.IsOutputRedirected) return;          // redirected output/input/pipe
+            if (Debugger.IsAttached) return;                 // debugger attached
+        }
+
+        Console.WriteLine(message ?? "Press Enter to exit . . .");
+        try { Console.ReadLine(); } catch { /* ignore */ }
+    }
+
 
     // Helper function to resolve paths (relative to absolute)
     private static string ResolvePath(string baseDirectory, string configPath)
@@ -230,16 +286,39 @@ internal static class Program
         if (!ok) throw new Exception("Flask failed to become healthy.");
         WriteLine("Flask is healthy.");
     }
-
-    private static async Task<bool> IsHealthyAsync()
+   
+    public static async Task<bool> IsHealthyAsync(CancellationToken ct = default)
     {
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            var resp = await Http.GetAsync("/health", cts.Token);
-            return resp.IsSuccessStatusCode;
+            using var req = new HttpRequestMessage(HttpMethod.Get, "health")
+            {
+                //   use HTTP/1.0, avoid unexpected HTTP/1.0
+                Version = new Version(1, 1),
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrLower
+            };
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+
+            using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+
+
+            var ok = resp.IsSuccessStatusCode;
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            Console.WriteLine($"Health {((int)resp.StatusCode)} ; body={body}");
+            return ok;
         }
-        catch { return false; }
+        catch (TaskCanceledException ex)
+        {
+            // if we want to distinguish timeout vs user cancel, check ex.CancellationToken
+            Console.WriteLine($"Canceled/Timeout: {ex.Message}");
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Request failed: {ex.Message}");
+            return false;
+        }
     }
 
     private static async Task<bool> WaitHealthyAsync(int timeoutSeconds)
@@ -414,13 +493,12 @@ internal static class Program
 
     private static async Task<string> ProcessTemplateAsync(JObject template)
     {
-        // read schedule info
+        // read schedule
         string scheduleStart = template["schedule"]?["startDate"]?.ToString() ?? DateTime.Today.ToString("yyyy-MM-dd");
         string scheduleFreq = template["schedule"]?["frequency"]?.ToString() ?? "By Day";
 
-        // collect blocks and images
-        var blocks = new List<(string text, bool center)>();
-        var images = new List<byte[]>();
+        // ordered items
+        var items = new List<DocItem>();
 
         var layout = template["layout"] as JArray ?? new JArray();
         foreach (var tok in layout.OfType<JObject>())
@@ -431,28 +509,32 @@ internal static class Program
             {
                 var content = tok["content"] as JObject;
                 string text = content?["text"]?.ToString() ?? "";
-                blocks.Add((text, true));
+                items.Add(new DocItem(DocItemType.Text, text, Center: true));
             }
             else if (type == "Comment")
             {
                 var content = tok["content"] as JObject;
                 string text = content?["text"]?.ToString() ?? "";
-                blocks.Add((text, false));
+                items.Add(new DocItem(DocItemType.Text, text, Center: false));
             }
             else if (type == "Plot")
             {
-                // replace BeginDate in params
+                // fill in params
                 var param = tok["params"] as JObject ?? new JObject();
-                param["BeginDate"] = scheduleStart;
+                param["beginDate"] = scheduleStart;
 
                 string? imgPath = await RequestPlotAsync(param);
                 if (!string.IsNullOrWhiteSpace(imgPath) && File.Exists(imgPath))
-                    images.Add(await File.ReadAllBytesAsync(imgPath));
+                {
+                    byte[] png = await File.ReadAllBytesAsync(imgPath);
+                    items.Add(new DocItem(DocItemType.Image, ImageBytes: png));
+                }
             }
+            // else ignore unknown type such as add Table in the future
         }
 
         string outputPdf = GetOutputPdfPath(template);
-        await GeneratePdfAsync(outputPdf, blocks, images);
+        await GeneratePdfAsync(outputPdf, items);
         return outputPdf;
     }
 
@@ -485,7 +567,7 @@ internal static class Program
         return Path.Combine(dir, name);
     }
 
-    private static Task GeneratePdfAsync(string outputPath, List<(string text, bool center)> blocks, List<byte[]> images)
+    private static Task GeneratePdfAsync(string outputPath, List<DocItem> items)
     {
         return Task.Run(() =>
         {
@@ -499,19 +581,21 @@ internal static class Program
 
                     page.Content().Column(col =>
                     {
-                        // 
-                        foreach (var (text, center) in blocks)
+                        foreach (var it in items)
                         {
-                            col.Item().PaddingBottom(12).Text(t =>
+                            if (it.Type == DocItemType.Text)
                             {
-                                if (center) t.AlignCenter();
-                                t.Span(text ?? "");
-                            });
+                                col.Item().PaddingBottom(12).Text(t =>
+                                {
+                                    if (it.Center) t.AlignCenter();
+                                    t.Span(it.Text ?? string.Empty);
+                                });
+                            }
+                            else if (it.Type == DocItemType.Image && it.ImageBytes is not null)
+                            {
+                                col.Item().PaddingBottom(18).Image(it.ImageBytes).FitWidth();
+                            }
                         }
-
-                        // plots
-                        foreach (var img in images)
-                            col.Item().PaddingBottom(18).Image(img).FitWidth();
                     });
 
                     page.Footer().AlignCenter().Text(x =>

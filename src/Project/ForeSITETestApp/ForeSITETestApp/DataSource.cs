@@ -30,7 +30,6 @@ namespace ForeSITETestApp
         private string _name;
         private string _type;
         private string _defaultValue;
-        private bool _displayInUI;
         private string _title;
 
         public string Name
@@ -72,18 +71,7 @@ namespace ForeSITETestApp
             }
         }
 
-        public bool DisplayInUI
-        {
-            get { return _displayInUI; }
-            set
-            {
-                if (_displayInUI != value)
-                {
-                    _displayInUI = value;
-                    OnPropertyChanged("DisplayInUI");
-                }
-            }
-        }
+
 
         public string Title
         {
@@ -262,7 +250,7 @@ namespace ForeSITETestApp
                     Name = prop.Name,
                     Type = prop.Type,
                     DefaultValue = prop.DefaultValue,
-                    DisplayInUI = prop.DisplayInUI
+                   
                 });
             }
 

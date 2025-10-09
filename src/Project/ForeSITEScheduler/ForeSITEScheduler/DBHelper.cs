@@ -18,10 +18,11 @@ namespace SchedulerRunner
         static DBHelper()
         {
             // Initialize database path in Python subdirectory
-            string currentDirectory = Directory.GetCurrentDirectory();
+            string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
             string pythonDirectory = Path.Combine(currentDirectory, "Server");
             DatabasePath = Path.Combine(pythonDirectory, "foresite_alerting.db");
             ConnectionString = $"Data Source={DatabasePath}";
+            Console.WriteLine($"Database path set to: {DatabasePath}");
 
             // Ensure Python directory exists
             EnsurePythonDirectoryExists();
@@ -51,11 +52,19 @@ namespace SchedulerRunner
             {
                 EnsurePythonDirectoryExists();
 
-                using var connection = new SqliteConnection(ConnectionString);
+                var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
-                command.CommandText = @"
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"PRAGMA journal_mode=WAL;      -- 只需设置一次，库级别
+                                        PRAGMA synchronous=NORMAL;     -- 性能/可靠性折中
+                                        PRAGMA busy_timeout=5000;"; //--5 秒等待写锁
+                    cmd.ExecuteNonQuery();
+                }
+
+                using (var command = connection.CreateCommand()) { 
+                       command.CommandText = @"
                     CREATE TABLE IF NOT EXISTS DataSources (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Name TEXT NOT NULL UNIQUE,
@@ -66,12 +75,13 @@ namespace SchedulerRunner
                         CreatedDate TEXT DEFAULT CURRENT_TIMESTAMP,
                         LastUpdated TEXT DEFAULT CURRENT_TIMESTAMP
                     )";
-                command.ExecuteNonQuery();
+                       command.ExecuteNonQuery();
+                }
 
 
-
-                command = connection.CreateCommand();
-                command.CommandText = @"
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
                     CREATE TABLE IF NOT EXISTS models (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Name TEXT NOT NULL UNIQUE,
@@ -82,11 +92,13 @@ namespace SchedulerRunner
                         CreatedDate TEXT DEFAULT CURRENT_TIMESTAMP,
                         LastUpdated TEXT DEFAULT CURRENT_TIMESTAMP
                     )";
-                command.ExecuteNonQuery();
+                    command.ExecuteNonQuery();
+                }
 
                 // New: Create scheduler table
-                command = connection.CreateCommand();
-                command.CommandText = @"
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS scheduler (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
                         Recipients TEXT,
@@ -94,12 +106,14 @@ namespace SchedulerRunner
                         StartDate TEXT,
                         Freq TEXT
                 )";
-                command.ExecuteNonQuery();
+                    command.ExecuteNonQuery();
+                }
 
 
                 // New: Create modelproperties table
-                command = connection.CreateCommand();
-                command.CommandText = @"
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS modelproperties (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ModelId INTEGER NOT NULL,
@@ -110,7 +124,8 @@ namespace SchedulerRunner
                     DisplayInUI INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY (modelId) REFERENCES models(Id) ON DELETE CASCADE
                 )";
-                command.ExecuteNonQuery();
+                    command.ExecuteNonQuery();
+                }
 
                 // Check if table is empty and insert initial data if needed
                 if (GetDataSourceCount() == 0)
@@ -277,7 +292,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = @"
                     INSERT INTO models (Name, FullName, Description, Type, Enabled, CreatedDate, LastUpdated) 
                     VALUES ($modelName, $fullmodelName, $description, $type,  $enabled,$createdDate, $lastUpdated)";
@@ -318,7 +333,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = @"
                     INSERT INTO DataSources (Name, DataURL, ResourceURL, AppToken, IsRealtime, CreatedDate, LastUpdated) 
                     VALUES ($name, $dataUrl, $resourceUrl, $appToken, $isRealtime, $createdDate, $lastUpdated)";
@@ -583,7 +598,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = "SELECT COUNT(*) FROM DataSources";
                 return Convert.ToInt32(command.ExecuteScalar());
             }
@@ -713,7 +728,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = "SELECT COUNT(*) FROM models";
                 return Convert.ToInt32(command.ExecuteScalar());
             }
@@ -988,7 +1003,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = @"
                     INSERT OR REPLACE INTO DataSources (Name, DataURL, ResourceURL, AppToken, IsRealtime, LastUpdated) 
                     VALUES ($name, $dataUrl, $resourceUrl, $appToken, $isRealtime, $lastUpdated)";
@@ -1026,7 +1041,7 @@ namespace SchedulerRunner
                 using var connection = new SqliteConnection(ConnectionString);
                 connection.Open();
 
-                var command = connection.CreateCommand();
+                using var command = connection.CreateCommand();
                 command.CommandText = "DELETE FROM DataSources WHERE Name = $name COLLATE NOCASE";
                 command.Parameters.AddWithValue("$name", name.Trim());
 

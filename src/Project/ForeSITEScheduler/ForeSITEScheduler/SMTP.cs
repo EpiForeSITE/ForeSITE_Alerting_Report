@@ -54,9 +54,10 @@ namespace ForeSITEScheduler
             }
 
             // 2) read config.json
-            string currentDirectory = Directory.GetCurrentDirectory();
+            string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
             string pythonDirectory = Path.Combine(currentDirectory, "Server");
             var jsonPath = Path.Combine(pythonDirectory, "config.json");
+            Console.WriteLine($"Looking for SMTP config in: {jsonPath}");
 
 
             if (File.Exists(jsonPath))

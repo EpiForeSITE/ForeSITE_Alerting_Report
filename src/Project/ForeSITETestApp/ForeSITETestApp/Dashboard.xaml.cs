@@ -9,7 +9,10 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.VisualBasic;
 using Microsoft.Win32;
+using Microsoft.Xaml.Behaviors.Layout;
 using Newtonsoft.Json.Linq;
+using OllamaSharp.Models;
+
 //using PdfSharp.Drawing;
 //using PdfSharp.Fonts;
 //using PdfSharp.Pdf;
@@ -27,6 +30,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Markup;
@@ -50,6 +54,9 @@ namespace ForeSITETestApp
         private TextBlock? _placeholderTextBlock; // Class-level field
 
         private NotebookWindow? _notebookWindow;
+
+        private ObservableCollection<Model> _models;
+
         public Dashboard(MainWindow window)
         {
             InitializeComponent();
@@ -57,6 +64,13 @@ namespace ForeSITETestApp
             _httpClient = window.getHttpClient();
             _reportElements = new List<ReportElement>(); // Initialize report elements list
             InitializeDataSources();
+
+            InitializeModels();
+
+            InitTimeSelectors();
+
+            UpdateSchedulerButtons();
+
 
             ObservableCollection<SchedulerTask> schedulers = DBHelper.GetAllSchedulers();
             SchedulerTable.ItemsSource = schedulers;
@@ -72,6 +86,17 @@ namespace ForeSITETestApp
             DataContext = this;
         }
 
+        private const string TaskName = "ForeSITE_Alerting_Scheduler";
+
+        private void UpdateSchedulerButtons()
+        {
+            bool exists = TaskExists(TaskName);
+
+            // 如果任务存在，禁用 Start，启用 End
+            BtnStart.IsEnabled = !exists;
+            BtnEnd.IsEnabled = exists;
+        }
+
         // INotifyPropertyChanged implementation
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -80,7 +105,15 @@ namespace ForeSITETestApp
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        private void InitTimeSelectors()
+        {
+            HourSelector.ItemsSource = Enumerable.Range(0, 24).Select(i => i.ToString("00"));
+            MinuteSelector.ItemsSource = Enumerable.Range(0, 60).Select(i => i.ToString("00"));
 
+          
+            // HourSelector.SelectedItem = next.Hour.ToString("00");
+            // MinuteSelector.SelectedItem = next.Minute.ToString("00");
+        }
 
         public int DataSourceCount
         {
@@ -109,7 +142,27 @@ namespace ForeSITETestApp
             UpdateDataSourceCountDisplay();
         }
 
+        private void InitializeModels()
+        {
+            // read all models
+            _models = DBHelper.GetAllmodels();
 
+            
+
+            // bind（lstModel）
+            lstModel.ItemsSource = _models;
+            //bind （ModelSelector）
+            ModelSelector.ItemsSource = _models;
+
+            if (_models.Any())
+            {
+                lstModel.SelectedIndex = 0;
+                ModelSelector.SelectedIndex = 4;
+            }
+
+        }
+
+    
         private void SchedulerButton_Click(object sender, RoutedEventArgs e)
         {
             HeaderTitle.Text = "Schedule Builder";
@@ -267,15 +320,15 @@ namespace ForeSITETestApp
         // Helper method to add new data source to database
         private bool AddDataSourceToDatabase(string name, string dataUrl, string resourceUrl, string appToken, bool isRealtime)
         {
-           return DBHelper.InsertDataSource(new DataSource
+            return DBHelper.InsertDataSource(new DataSource
             {
                 Name = name,
                 DataURL = dataUrl,
                 ResourceURL = resourceUrl,
                 AppToken = appToken,
-               IsRealtime = isRealtime
+                IsRealtime = isRealtime
             });
-            
+
         }
 
         // Helper method to refresh data sources list
@@ -604,7 +657,7 @@ namespace ForeSITETestApp
 
                         dataUrl = dataUrlInput.Text.Trim();
                         resourceUrl = resourceUrlInput.Text.Trim();
-                        appToken=appTokenInput.Text.Trim();
+                        appToken = appTokenInput.Text.Trim();
 
                     }
                     else
@@ -691,7 +744,7 @@ namespace ForeSITETestApp
 
         private void DeleteDataSourceButton_Click(object sender, RoutedEventArgs e)
         {
-            
+
             if (DataSourceTable.SelectedItem is DataSource selectedDataSource)
             {
                 if (string.IsNullOrWhiteSpace(selectedDataSource.Name))
@@ -749,7 +802,7 @@ namespace ForeSITETestApp
                 if (sfd.ShowDialog() != true)
                     return;
 
-                
+
                 var root = new JObject
                 {
                     ["templateVersion"] = "1.0",
@@ -796,14 +849,14 @@ namespace ForeSITETestApp
                         var plotJson = new JObject
                         {
                             ["type"] = "Plot",
-                            ["params"] = param 
+                            ["params"] = param
                         };
                         layout.Add(plotJson);
                     }
                     // Comment
                     else if (re.Type == ReportElementType.Comment)
                     {
-                        
+
                         FlowDocument? doc = null;
 
                         if (border.Tag is CommentMeta meta && meta.Document != null)
@@ -831,19 +884,19 @@ namespace ForeSITETestApp
                 // TODO: it will be nice to validate layout has at least one Plot
                 root["layout"] = layout;
 
-                
+
                 string scheduleStart = "";
                 string scheduleFreq = "";
 
-                
+
                 var firstPlot = _reportElements.FirstOrDefault(e => e.Type == ReportElementType.Plot);
                 if (firstPlot?.Element is Border b && b.Tag is JObject tag && tag["graph"] is JObject g)
                 {
-                    scheduleStart = g["BeginDate"]?.ToString() ?? "";
-                    scheduleFreq = g["Freq"]?.ToString() ?? "";
+                    scheduleStart = g["beginDate"]?.ToString() ?? "";
+                    scheduleFreq = g["freq"]?.ToString() ?? "";
                 }
 
-                
+
                 root["schedule"] = new JObject
                 {
                     ["startDate"] = scheduleStart,   // e.g. "2025-09-12"
@@ -859,7 +912,7 @@ namespace ForeSITETestApp
                 string recipients = "";
                 if (this.FindName("RecipientEmailsBox") is TextBox recipientBox && !string.IsNullOrWhiteSpace(recipientBox.Text))
                 {
-                    
+
                     var lines = recipientBox.Text
                         .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                         .Select(x => x.Trim())
@@ -900,21 +953,21 @@ namespace ForeSITETestApp
         // refresh Scheduler DataGrid 
         private void RefreshSchedulerUI()
         {
-            
+
             var latest = DBHelper.GetAllSchedulers(); // ObservableCollection<SchedulerTask>
 
             if (SchedulerTable.ItemsSource is ObservableCollection<SchedulerTask> current)
             {
                 current.Clear();
                 foreach (var item in latest)
-                    current.Add(item);       
+                    current.Add(item);
             }
             else
             {
-                SchedulerTable.ItemsSource = latest;  
+                SchedulerTable.ItemsSource = latest;
             }
 
-          
+
         }
 
 
@@ -930,7 +983,7 @@ namespace ForeSITETestApp
             catch { return ""; }
         }
 
-        
+
         private static string FlowDocToPlainText(FlowDocument? doc)
         {
             if (doc == null) return "";
@@ -942,7 +995,7 @@ namespace ForeSITETestApp
             catch { return ""; }
         }
 
-        
+
         private static JObject ExtractPlotParamsFromTag(object? tag)
         {
             // target: only save itle / model / yearBack / trainSplitRatio (if exist)
@@ -967,34 +1020,34 @@ namespace ForeSITETestApp
             {
                 if (tag is JObject jtag)
                 {
-                    
+
                     var g = jtag["graph"] as JObject ?? jtag;
 
                     title = S(jtag["title"]) ?? S(g["Title"]);
-                    model = S(g["Model"]);
-                    yearBack = S(g["YearBack"]) ?? S(g["years_back"]);
-                    trainSplitRatio = S(g["TrainSplitRatio"]);
+                    model = S(g["model"]);
+                    yearBack = S(g["yearBack"]) ?? S(g["years_back"]);
+                    trainSplitRatio = S(g["trainSplitRatio"]);
 
-                    
-                    dataSource = S(g["DataSource"]);
-                    beginDate = S(g["BeginDate"]);
-                    freq = S(g["Freq"]);
-                    threshold = S(g["Threshold"]);
-                    useTrainSplit = S(g["UseTrainSplit"]);
-                    trainEndDate = S(g["TrainEndDate"]);
+
+                    dataSource = S(g["dataSource"]);
+                    beginDate = S(g["beginDate"]);
+                    freq = S(g["freq"]);
+                    threshold = S(g["threshold"]);
+                    useTrainSplit = S(g["useTrainSplit"]);
+                    trainEndDate = S(g["trainEndDate"]);
                 }
             }
             catch { /*  */ }
 
             var o = new JObject();
 
-            
+
             if (!string.IsNullOrEmpty(title)) o["title"] = title;
             if (!string.IsNullOrEmpty(model)) o["model"] = model;
             if (!string.IsNullOrEmpty(yearBack)) o["yearBack"] = yearBack;
             if (!string.IsNullOrEmpty(trainSplitRatio)) o["trainSplitRatio"] = trainSplitRatio;
 
-            
+
             if (!string.IsNullOrEmpty(dataSource)) o["dataSource"] = dataSource;
             if (!string.IsNullOrEmpty(beginDate)) o["beginDate"] = beginDate;
             if (!string.IsNullOrEmpty(freq)) o["freq"] = freq;
@@ -1005,7 +1058,7 @@ namespace ForeSITETestApp
             return o;
         }
 
-       
+
         private static FlowDocument? TryGetTitleFlowDoc(Border titleBorder)
         {
             if (titleBorder?.Child is Grid g)
@@ -1338,8 +1391,8 @@ namespace ForeSITETestApp
             // Update report elements: replace or insert title
             if (_reportElements.Any() && _reportElements.First().Type == ReportElementType.Title)
             {
-                 _reportElements[0] = new ReportElement { Type = ReportElementType.Title, Element = titleBorder };
-                
+                _reportElements[0] = new ReportElement { Type = ReportElementType.Title, Element = titleBorder };
+
             }
             else
             {
@@ -1384,17 +1437,17 @@ namespace ForeSITETestApp
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            
+
             var initialParagraph = new Paragraph(new Run(""))
             {
-                LineHeight = 16,                     
+                LineHeight = 16,
                 LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
-                Margin = new Thickness(0, 2, 0, 2)  
+                Margin = new Thickness(0, 2, 0, 2)
             };
 
             var initialDoc = new FlowDocument(initialParagraph)
             {
-                PageWidth = commentBorder.Width - 60,  
+                PageWidth = commentBorder.Width - 60,
             };
 
             var rich = new RichTextBox
@@ -1410,11 +1463,11 @@ namespace ForeSITETestApp
                 //Width = canvasWidth * 0.9 - 60 
             };
 
-           
+
             rich.TextChanged += (s, e) =>
             {
                 rich.Document.PageWidth = commentBorder.Width - 60;
-                
+
                 foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
                 {
                     p.LineHeight = 16;
@@ -1426,7 +1479,7 @@ namespace ForeSITETestApp
                 RedrawCanvas();
                 UpdateCanvasHeight();
 
-                
+
                 if (commentBorder.Tag is CommentMeta meta)
                     meta.Document = CloneFlowDocument(rich.Document);
             };
@@ -1434,7 +1487,7 @@ namespace ForeSITETestApp
             Grid.SetColumn(rich, 0);
             Grid.SetRow(rich, 0);
 
-           
+
             commentBorder.Tag = new CommentMeta
             {
                 Document = CloneFlowDocument(initialDoc)
@@ -1472,7 +1525,7 @@ namespace ForeSITETestApp
                 editor.Owner = Window.GetWindow(this);
                 editor.ShowDialog();
 
-                
+
                 rich.Document.PageWidth = commentBorder.Width - 60;
                 foreach (var p in rich.Document.Blocks.OfType<Paragraph>())
                 {
@@ -1482,10 +1535,10 @@ namespace ForeSITETestApp
                 }
 
 
-               
+
                 commentBorder.Height = Math.Max(160, rich.ExtentHeight + 20);
 
-               
+
                 if (commentBorder.Tag is CommentMeta meta)
                     meta.Document = CloneFlowDocument(rich.Document);
 
@@ -1521,7 +1574,7 @@ namespace ForeSITETestApp
 
             deleteButton.Click += (s, args) =>
             {
-                
+
                 _reportElements.RemoveAll(e => ReferenceEquals(e.Element, commentBorder));
                 RedrawCanvas();
                 CheckAndManagePlaceholder();
@@ -1581,7 +1634,7 @@ namespace ForeSITETestApp
                     return;
                 }
 
-               
+
                 var dlg = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "PDF Files (*.pdf)|*.pdf",
@@ -1593,7 +1646,7 @@ namespace ForeSITETestApp
 
                 string filePath = dlg.FileName;
 
-                
+
                 QuestPDF.Settings.License = LicenseType.Community;
 
                 Document
@@ -1607,7 +1660,7 @@ namespace ForeSITETestApp
 
                             page.Content().Column(col =>
                             {
-                                
+
                                 foreach (var re in _reportElements)
                                 {
                                     if (re.Element is not Border border || border.Child is not Grid grid)
@@ -1617,7 +1670,7 @@ namespace ForeSITETestApp
                                     {
                                         case ReportElementType.Title:
                                             {
-                                               
+
                                                 FlowDocument titleDoc = _titleDocument
                                                                 ?? new FlowDocument(new Paragraph(new Run(
                                                                     grid.Children.OfType<TextBlock>().FirstOrDefault()?.Text ?? "")));
@@ -1646,7 +1699,7 @@ namespace ForeSITETestApp
 
                                         case ReportElementType.Comment:
                                             {
-                                                
+
                                                 FlowDocument? doc = null;
                                                 if (border.Tag is CommentMeta meta && meta.Document != null)
                                                     doc = meta.Document;
@@ -1659,7 +1712,7 @@ namespace ForeSITETestApp
                                                .PaddingBottom(12)
                                                .Text(t =>
                                                    {
-                                                       
+
                                                        t.DefaultTextStyle(x => x.FontSize(11));
                                                        AppendFlowDocToQuest(t, doc);
                                                    });
@@ -1703,7 +1756,7 @@ namespace ForeSITETestApp
             {
                 if (block is Paragraph para)
                 {
-                   
+
                     foreach (var inline in para.Inlines)
                     {
                         if (inline is Run run)
@@ -1716,16 +1769,16 @@ namespace ForeSITETestApp
                         }
                         else if (inline is LineBreak)
                         {
-                           
+
                             t.Line("");
                         }
                     }
-                    
+
                     t.Line("");
                 }
                 else if (block is List list)
                 {
-                    
+
                     foreach (ListItem item in list.ListItems)
                     {
                         foreach (var itemBlock in item.Blocks)
@@ -1753,13 +1806,13 @@ namespace ForeSITETestApp
                         }
                     }
                 }
-               
+
             }
         }
 
 
         /// <summary>
-       
+
         /// </summary>
         private static byte[]? WpfBitmapToPngBytes(BitmapSource source)
         {
@@ -1777,7 +1830,7 @@ namespace ForeSITETestApp
             }
         }
 
-      
+
         private async void AddPlotButton_ClickAsync(object sender, RoutedEventArgs e)
         {
             try
@@ -1796,11 +1849,33 @@ namespace ForeSITETestApp
 
                 string model = (ModelSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Farrington";
                 string dataSource = (DataSourceSelector.SelectedItem as DataSource)?.Name ?? "";
-                string yearBack = (YearBackSelector.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "5";
+                //string yearBack = (YearBackSelector.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "5";
                 bool useTrainSplit = TrainSplitCheckBox.IsChecked ?? false;
                 string beginDate = BeginDatePicker.SelectedDate?.ToString("yyyy-MM-dd") ?? "";
                 string freq = (FreqSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "By Week";
                 string threshold = ThresholdInput.Text?.Trim() ?? "";
+
+                int? yearsBack = null;
+                int? mcMunu = null;
+                int? baseline = null;
+
+                var sel = (Model)ModelSelector.SelectedItem;
+                var key = sel?.Name?.Trim().ToLowerInvariant() ?? "";
+
+                if (key == "farrington" || key == "bayes" || key == "cdc")
+                {
+                    if (YearBackSelector.SelectedItem is ComboBoxItem item &&
+                        int.TryParse(item.Content?.ToString(), out var yb))
+                        yearsBack = yb;
+                }
+                else if (key == "boda")
+                {
+                    if (int.TryParse(TxtMcMunu.Text, out var v)) mcMunu = v;
+                }
+                else if (key == "earsc1")
+                {
+                    if (int.TryParse(TxtBaseline.Text, out var b)) baseline = b;
+                }
 
                 // Validate inputs
                 if (string.IsNullOrEmpty(dataSource))
@@ -1830,13 +1905,38 @@ namespace ForeSITETestApp
                 {
                     ["model"] = model,
                     ["dataSource"] = dataSource,
-                    ["yearBack"] = yearBack,
                     ["useTrainSplit"] = useTrainSplit,
                     ["beginDate"] = beginDate,
                     ["freq"] = freq,
                     ["threshold"] = threshold,
                     ["title"] = plotTitle
                 };
+
+                // 
+                switch (model?.ToLowerInvariant())
+                {
+                    case "farrington":
+                    case "bayes":
+                    case "cdc":
+                        if (yearsBack.HasValue)
+                            graphData["yearBack"] = yearsBack.Value;
+                        break;
+
+                    case "boda":
+                        if (mcMunu.HasValue)
+                            graphData["mc_munu"] = mcMunu;
+                        break;
+
+                    case "earsc1":
+                        if (baseline.HasValue)
+                            graphData["baseline"] = baseline;
+                        break;
+
+                    default:
+                       
+                        break;
+                }
+
 
                 if (useTrainSplit)
                 {
@@ -1996,16 +2096,16 @@ namespace ForeSITETestApp
 
                             // Set Grid as Border content
                             imageBorder.Child = contentGrid;
-                            
+
                             imageBorder.Tag = new JObject
                             {
                                 // full parameters（ graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
                                 ["graph"] = graphData,
 
-                               
+
                                 ["plot_path"] = file,
 
-                               
+
                                 ["title"] = plotTitle
                             };
 
@@ -2044,7 +2144,7 @@ namespace ForeSITETestApp
                 MessageBox.Show($"Error generating or adding plot: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-      
+
         private void UpdateCanvasHeight()
         {
             double canvasHeight = 0;
@@ -2052,8 +2152,8 @@ namespace ForeSITETestApp
                 canvasHeight += GetElementDefaultHeight(re);
 
             int gaps = Math.Max(_reportElements.Count - 1, 0);
-            canvasHeight += gaps * 30; 
-            canvasHeight += 30;        
+            canvasHeight += gaps * 30;
+            canvasHeight += 30;
 
             DrawingCanvas.Height = canvasHeight;
         }
@@ -2095,10 +2195,10 @@ namespace ForeSITETestApp
                 Canvas.SetLeft(border, (canvasWidth - border.Width) / 2.0);
                 DrawingCanvas.Children.Add(border);
 
-                y += border.Height + 30; 
+                y += border.Height + 30;
             }
         }
-       
+
 
 
         private void TrainSplitCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -2133,7 +2233,7 @@ namespace ForeSITETestApp
             }
         }
 
-       
+
 
         private void btnAddModel_Click(object sender, RoutedEventArgs e)
         {
@@ -2147,7 +2247,24 @@ namespace ForeSITETestApp
 
         private void lstModel_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            var m = lstModel.SelectedItem as Model;
+            if (m == null)
+            {
+                // 
+                txtModelName.Text = "";
+                txtFullModelName.Text = "";
+                cmbModelType.Text = "";
+                txtModelDescription.Text = "";
+                dgProperties.ItemsSource = null;
+                return;
+            }
+            txtModelName.Text = m.Name ?? "";
+            txtFullModelName.Text = m.FullName ?? "";
+            cmbModelType.Text = m.Type ?? "";
+            txtModelDescription.Text = m.Description ?? "";
 
+            // 
+            dgProperties.ItemsSource = m.Properties;
         }
 
         private void btnSaveModel_Click(object sender, RoutedEventArgs e)
@@ -2199,6 +2316,9 @@ namespace ForeSITETestApp
 
                 MessageBox.Show("Checked scheduler rows deleted.",
                                 "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                var view = CollectionViewSource.GetDefaultView(SchedulerTable.ItemsSource);
+                view?.Refresh();
             }
             catch (Exception ex)
             {
@@ -2246,7 +2366,7 @@ namespace ForeSITETestApp
                 int ok = 0, fail = 0;
                 foreach (var row in selectedRows)
                 {
-                    
+
                     string recipients = bulkRecipients ?? (row.Recipients ?? string.Empty);
                     string attachPath = row.AttachmentPath ?? string.Empty;
                     string startDate = row.StartDate ?? string.Empty;   // YYYY-MM-DD
@@ -2314,56 +2434,85 @@ namespace ForeSITETestApp
             return (p.ExitCode, output, error);
         }
 
+        // In SchedulerStart_Click, fix possible null reference for HourSelector/MinuteSelector.SelectedItem
         private void SchedulerStart_Click(object sender, RoutedEventArgs e)
         {
-            const string taskName = "foresite_alerting";
             string exePath = Path.Combine(AppContext.BaseDirectory, "ForeSITEScheduler.exe");
 
             try
             {
-                if (TaskExists(taskName))
+                if (TaskExists(TaskName))
                 {
-                    MessageBox.Show($"Task '{taskName}' already exists.", "Scheduler");
+                    MessageBox.Show($"Task '{TaskName}' already exists.", "Scheduler");
+                    UpdateSchedulerButtons();
                     return;
                 }
 
-                // schtasks /create /tn foresite_alerting /tr "C:\...\ForeSITEScheduler.exe" /sc daily /st 09:00 /f
-                string args = $"/create /tn {taskName} /tr \"\\\"{exePath}\\\"\" /sc daily /st 09:00 /f";
+                // ComboBox read time
+                if (HourSelector.SelectedItem == null || MinuteSelector.SelectedItem == null)
+                {
+                    MessageBox.Show("Please select both hour and minute before starting the scheduler.", "Scheduler");
+                    return;
+                }
+
+                string hour = HourSelector.SelectedItem?.ToString() ?? "00";
+                string minute = MinuteSelector.SelectedItem?.ToString() ?? "00";
+                string startTime = $"{hour}:{minute}";
+
+                string args = $"/create /tn {TaskName} /tr \"\\\"{exePath}\\\"\" /sc daily /st {startTime} /f";
                 var (exit, stdout, stderr) = RunSchTasks(args);
 
                 if (exit == 0)
-                    MessageBox.Show($"Task '{taskName}' created successfully to run daily at 09:00.\n{stdout}", "Scheduler");
+                {
+                    MessageBox.Show($"Task '{TaskName}' created successfully to run daily at {startTime}.\n{stdout}",
+                                    "Scheduler", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
                 else
-                    MessageBox.Show($"Failed to create task.\n{stderr}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+                {
+                    MessageBox.Show($"Failed to create task.\n{stderr}",
+                                    "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error: {ex.Message}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
+            // 
+            UpdateSchedulerButtons();
         }
 
         private void SchedulerEnd_Click(object sender, RoutedEventArgs e)
         {
-            const string taskName = "foresite_alerting";
             try
             {
-                if (!TaskExists(taskName))
+                if (!TaskExists(TaskName))
                 {
-                    MessageBox.Show($"Task '{taskName}' does not exist.", "Scheduler");
+                    MessageBox.Show($"Task '{TaskName}' does not exist.", "Scheduler");
+                    UpdateSchedulerButtons();
                     return;
                 }
 
-                var (exit, stdout, stderr) = RunSchTasks($"/delete /tn {taskName} /f");
+                string args = $"/delete /tn {TaskName} /f";
+                var (exit, stdout, stderr) = RunSchTasks(args);
+
                 if (exit == 0)
-                    MessageBox.Show($"Task '{taskName}' deleted.\n{stdout}", "Scheduler");
+                {
+                    MessageBox.Show($"Task '{TaskName}' deleted successfully.\n{stdout}",
+                                    "Scheduler", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
                 else
-                    MessageBox.Show($"Failed to delete task.\n{stderr}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+                {
+                    MessageBox.Show($"Failed to delete task.\n{stderr}",
+                                    "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error: {ex.Message}", "Scheduler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+
+            UpdateSchedulerButtons();
         }
 
         private void SchedulerSelectCheckBox_Click(object sender, RoutedEventArgs e)
@@ -2394,5 +2543,45 @@ namespace ForeSITETestApp
             }
         }
 
+        private void ModelSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var model = ModelSelector.SelectedItem as Model;
+            var name = model?.Name?.Trim() ?? string.Empty;
+            var key = name.ToLowerInvariant();
+
+            ShowOnlyPanel(null);
+
+            if (key == "farrington" || key == "bayes" || key == "cdc")
+            {
+                ShowOnlyPanel(YearBackPanel);
+                // default
+                if (YearBackSelector.SelectedIndex < 0) YearBackSelector.SelectedIndex = 0;
+            }
+            else if (key == "boda")
+            {
+                ShowOnlyPanel(BodaPanel);
+                if (string.IsNullOrWhiteSpace(TxtMcMunu.Text)) TxtMcMunu.Text = "100";
+            }
+            else if (key == "earsc1")
+            {
+                ShowOnlyPanel(EarsC1Panel);
+                if (string.IsNullOrWhiteSpace(TxtBaseline.Text)) TxtBaseline.Text = "7";
+            }
+            else
+            {
+                // others
+                ShowOnlyPanel(null);
+            }
+
+        }
+        private void ShowOnlyPanel(FrameworkElement? panelToShow)
+        {
+            YearBackPanel.Visibility = Visibility.Collapsed;
+            BodaPanel.Visibility = Visibility.Collapsed;
+            EarsC1Panel.Visibility = Visibility.Collapsed;
+
+            if (panelToShow != null)
+                panelToShow.Visibility = Visibility.Visible;
+        }
     }
 }

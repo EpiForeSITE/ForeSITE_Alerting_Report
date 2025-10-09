@@ -181,8 +181,7 @@
                                     SelectionMode="Extended"
                                     SelectionUnit="FullRow">
                                     <DataGrid.Columns>
-                                        <!-- 勾选列 -->
-                                        <!-- 勾选列（带 Click 事件） -->
+                                       
                                         <DataGridTemplateColumn Header="" Width="60">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -195,28 +194,28 @@
                                         </DataGridTemplateColumn>
 
 
-                                        <!-- Id 列 -->
+                                        <!-- Id  -->
                                         <DataGridTextColumn Header="Id"
                                         Width="60"
                                         Binding="{Binding Id}"
                                         IsReadOnly="True"/>
 
-                                        <!-- 新增 Recipients 列 -->
+                                        <!--  Recipients  -->
                                         <DataGridTextColumn Header="Recipients"
                                         Width="200"
                                         Binding="{Binding Recipients}"/>
 
-                                        <!-- 原有 AttachmentPath 列 -->
+                                        <!--  AttachmentPath  -->
                                         <DataGridTextColumn Header="AttachmentPath"
                                         Width="*"
                                         Binding="{Binding AttachmentPath}"/>
 
-                                        <!-- StartDate 列 -->
+                                        <!-- StartDate  -->
                                         <DataGridTextColumn Header="StartDate"
                                         Width="140"
                                         Binding="{Binding StartDate}"/>
 
-                                        <!-- Freq 列 -->
+                                        <!-- Freq  -->
                                         <DataGridTextColumn Header="Freq"
                                         Width="120"
                                         Binding="{Binding Freq}"/>
@@ -224,17 +223,47 @@
 
                                 </DataGrid>
 
-                                <!-- 操作按钮 -->
+                                <!-- buttons -->
                                 <StackPanel Grid.Row="3"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right">
                                     <Button Content="Delete"  Margin="0,0,10,0" Padding="14,6" Click="SchedulerDelete_Click"/>
                                     <Button Content="Save"    Margin="0,0,10,0" Padding="14,6" Click="SchedulerSave_Click"/>
-                                    <Button Content="Start"   Margin="0,0,10,0" Padding="14,6" Click="SchedulerStart_Click"/>
-                                    <Button Content="End"                    Padding="14,6" Click="SchedulerEnd_Click"/>
+                                    
                                 </StackPanel>
                             </Grid>
                         </Border>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Center">
+                            
+                            <TextBlock Text="Task: " FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="ForeSITE_Alerting_Scheduler" Margin="4,0,12,0" VerticalAlignment="Center"/>
+
+                            
+                            <TextBlock Text="Time:" FontWeight="SemiBold" Margin="8,0,6,0" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="HourSelector"
+                                Width="70"
+                                SelectedIndex="20"  
+                                Margin="0,0,6,0"
+                                VerticalAlignment="Center"/>
+                                <TextBlock Text=":" VerticalAlignment="Center" />
+                                <ComboBox x:Name="MinuteSelector"
+                                    Width="70"
+                                    SelectedIndex="0"    
+                                    Margin="6,0,12,0"
+                                    VerticalAlignment="Center"/>
+
+                                    
+                                <Button x:Name="BtnStart"
+                                    Content="Start"
+                                    Width="80"
+                                    Margin="10,0,6,0"
+                                    Click="SchedulerStart_Click"/>
+                                <Button x:Name="BtnEnd"
+                                    Content="End"
+                                    Width="80"
+                                    Click="SchedulerEnd_Click"/>
+                        </StackPanel>
 
 
 
@@ -263,22 +292,49 @@
                                     <!-- Model Selector -->
                                     <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
                                         <TextBlock Text="Model" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                        <ComboBox x:Name="ModelSelector" SelectedIndex="0" Width="150" HorizontalAlignment="Left">
-                                            <ComboBoxItem Content="Farrington"/>
-                                            <ComboBoxItem Content="GLR"/>
-                                            <ComboBoxItem Content="CDC"/>
-                                            <ComboBoxItem Content="HMM"/>
-                                        </ComboBox>
+                                        <ComboBox x:Name="ModelSelector"
+                                             Width="150"
+                                             HorizontalAlignment="Left"
+                                             DisplayMemberPath="Name"
+                                             SelectedIndex="4" SelectionChanged="ModelSelector_SelectionChanged"/>
                                     </StackPanel>
 
-                                    <!-- History year back Selector -->
-                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
+                                    <!-- History year back Selector (Farrington / Bayes / CDC)-->
+                                    <StackPanel x:Name="YearBackPanel" Grid.Row="0" Grid.Column="1" Margin="10,0,0,10" Visibility="Collapsed">
                                         <TextBlock Text="Num of years back" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,5"/>
                                         <ComboBox x:Name="YearBackSelector" SelectedIndex="0" Width="150" HorizontalAlignment="Left">
                                             <ComboBoxItem Content="3"/>
                                             <ComboBoxItem Content="5"/>
                                             <ComboBoxItem Content="1"/>
                                         </ComboBox>
+                                    </StackPanel>
+
+                                    <!-- Boda 参数：mc_munu -->
+                                    <StackPanel x:Name="BodaPanel"
+                                          Grid.Row="0" Grid.Column="1"
+                                          Margin="10,0,0,10"
+                                          Visibility="Collapsed">
+                                        <TextBlock Text="Num of Sampled Vectors"
+                                                  FontSize="14" FontWeight="SemiBold"
+                                                  Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtMcMunu"
+                                             Width="150"
+                                             HorizontalAlignment="Left"
+                                             Text="100"/>
+                                    </StackPanel>
+
+                                    <!-- EarsC1 参数：baseline -->
+                                    <StackPanel x:Name="EarsC1Panel"
+                                          Grid.Row="0" Grid.Column="1"
+                                          Margin="10,0,0,10"
+                                          Visibility="Collapsed">
+                                        <TextBlock Text="Baseline(days)"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Margin="0,0,0,5"/>
+                                        <TextBox x:Name="TxtBaseline"
+                                               Width="150"
+                                               HorizontalAlignment="Left"
+                                               Text="7"/>
                                     </StackPanel>
 
                                     <!-- Data Source Selector -->
@@ -390,7 +446,7 @@
 
                     </Grid.RowDefinitions>
 
-                    <!-- 顶部标题和按钮 -->
+                    <!-- top and button -->
                     <Grid Grid.Row="0" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -404,7 +460,7 @@
                             <Button x:Name="btnDeleteModel" Content="Delete Model" Margin="5" Padding="8,3" Click="btnDeleteModel_Click"/>
                         </StackPanel>
                     </Grid>
-                    <!-- 中间主要内容区域 -->
+                    <!-- middle -->
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="250"/>
@@ -417,13 +473,13 @@
                         <!-- Left Model list -->
                         <Border Grid.Column="0" BorderThickness="1" BorderBrush="#DDDDDD" Background="#F5F5F5">
                             <DockPanel>
-                                <TextBlock DockPanel.Dock="Top" Text="Module List" Padding="10,5" Background="#EEEEEE" />
+                                <TextBlock DockPanel.Dock="Top" Text="Module List" FontWeight="SemiBold" Padding="10,5" Background="#EEEEEE" />
                                 <ListBox x:Name="lstModel" Margin="5" SelectionChanged="lstModel_SelectionChanged">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Vertical" Margin="3">
+                                            <StackPanel Orientation="Horizontal">
                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
-                                                <TextBlock Text="{Binding Type}" Foreground="Gray" FontSize="11"/>
+                                               
                                             </StackPanel>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
@@ -455,9 +511,9 @@
                                     </Grid.RowDefinitions>
 
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Full Name:" Margin="0,0,10,5" VerticalAlignment="Center"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtFullModuleName" Margin="0,0,20,5"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Variable Name:" Margin="0,0,10,5" VerticalAlignment="Center"/>
-                                    <TextBox Grid.Row="0" Grid.Column="3" x:Name="txtModuleName" Margin="0,0,20,5"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtFullModelName" Margin="0,0,20,5"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="Short Name:" Margin="0,0,10,5" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Row="0" Grid.Column="3" x:Name="txtModelName" Margin="0,0,20,5"/>
 
                                     <TextBlock Grid.Row="0" Grid.Column="4" Text="Type:" Margin="0,0,10,5" VerticalAlignment="Center"/>
                                     <ComboBox Grid.Row="0" Grid.Column="5" x:Name="cmbModelType" Margin="0,0,0,5">
@@ -466,7 +522,7 @@
                                     </ComboBox>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" Margin="0,5,10,0" VerticalAlignment="Top"/>
-                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" x:Name="txtModuleDescription" 
+                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="4" x:Name="txtModelDescription" 
                              Margin="0,5,0,0" TextWrapping="Wrap" AcceptsReturn="True" Height="60" 
                              VerticalScrollBarVisibility="Auto"/>
 
@@ -515,14 +571,13 @@
                                                         <ComboBoxItem Content="int"/>
                                                         <ComboBoxItem Content="float"/>
                                                         <ComboBoxItem Content="string"/>
-                                                        <ComboBoxItem Content="int_list"/>
-                                                        <ComboBoxItem Content="str_list"/>
+                                                       
                                                     </ComboBox>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellEditingTemplate>
                                         </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="Default Value" Binding="{Binding DefaultValue}" Width="*"/>
-                                        <DataGridCheckBoxColumn Header="Show on UI" Binding="{Binding DisplayInUI}" Width="0.5*"/>
+                                       
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </Grid>
