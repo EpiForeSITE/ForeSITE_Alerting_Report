@@ -12,7 +12,7 @@ This application integrates with a Python Flask localhost web server to process 
 ### 📊 Time-Series Data Integration  
 - Import and process surveillance datasets (**CSV, JSON, Web APIs**) 
 - Seamlessly interchange datasets between **R and Python** for flexible analysis.  
-- Prebuilt models (**Farrington, Bayes, Boda, CDC, CUSUM, EARS-C1**, etc.) for anomaly detection in clinical/public health data.  
+- Prebuilt models (**Farrington, Bayes, Boda, CDC, EARS-C1**, etc.) for anomaly detection in clinical/public health data.  
 
 ### 🔔 Alerting & Report Generation  
 - Automated **PDF report generation** with customizable titles and data-driven plots.  
@@ -39,6 +39,10 @@ This application integrates with a Python Flask localhost web server to process 
 - Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
 ## ✨ Changelog
+
+### Version 0.9
+- Added Model Management to support user's Python package and R package installation
+- Prebuilt models (**Farrington, Bayes, Boda, CDC, EARS-C1**, etc.) for anomaly detection in clinical/public health data.    
 
 ### Version 0.8 
 We’ve added support for Windows scheduled tasks to automate report delivery.
