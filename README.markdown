@@ -253,15 +253,21 @@ ForeSITE-Alerting-Report/
   - Flask: Web server framework
   - epySurv: Surveillance data processing module
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
-    
-## Scheduler Start Screen
-Start a windows task for our application
-![SchedulerScreen](images/Screenshot2025-09-17.png)
 
 ## Animation Demo
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
 - Select CDC data as a data source in the "Add Plot" dialog. 
-![Alerting_2](images/Alerting_2.gif)
+![Alerting1](images/Alerting_abnormal_true.gif)
+
+When the user selects **Abnormal Report Only**, the system will review data from the most recent three days or weeks to validate whether n_case exceeds the threshold. If the value is below the threshold, the plot will not be included in the report.
+
+This rule helps limit unnecessary email notifications.
+
+![Alerting1](images/Alerting_abnormal_false.gif)
+
+## Scheduler Start Screen
+Start a windows task for our application
+![SchedulerScreen](images/Screenshot2025-09-17.png)
 
 ### Advanced Data Analysis with Notebook
 Advanced users can leverage the "Data Analysis" feature to open a Jupyter-like Notebook window for runtime data analysis. This non-modal window allows users to:
@@ -284,12 +290,9 @@ R Language cell support (version 0.7)
 
 
 ## Screenshots
-(version 0.7)
-![Screenshot 2025-08-25](images/Screenshot2025-08-25-100422.png)
-(version 0.5)
-![Screenshot 2025-07-01](images/Screenshot-2025-7-1-01.png)
-(version 0.5)
-![Screenshot 2025-07-01](images/Screenshot-2025-7-1-02.png)
+(version 0.9.1)
+![Screenshot](images/Screenshot2025-10-27.png)
+
 
 
 
