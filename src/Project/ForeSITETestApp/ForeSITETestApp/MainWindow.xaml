@@ -2,39 +2,77 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        Style="{StaticResource MaterialDesignWindow}"
-        
-        Title="ForeSITE Alerting System" Height="600" Width="1500" Loaded="Window_Loaded" Closing="Window_Closing">
+        Title="ForeSITE Alerting System"
+        Height="600" Width="1500"
+        Icon="/ForeSITELogo.png"
+        Background="White"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing">
+
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Button.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Shadows.xaml" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.ToggleButton.xaml" />
-
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
-
     </Window.Resources>
+
     <ScrollViewer>
         <DockPanel>
-            <materialDesign:ColorZone Padding="16" 
-                                         Mode="PrimaryMid" DockPanel.Dock="Top">
-                <DockPanel>
-                    <ToggleButton Style="{StaticResource MaterialDesignHamburgerToggleButton}" IsChecked="False"
-                                     x:Name="MenuToggleButton"/>
-                    <materialDesign:PopupBox DockPanel.Dock="Right" PlacementMode="BottomAndAlignRightEdges" StaysOpen="False">
-                        <StackPanel>
-                            <Button Content="About" />
 
+            <!-- 顶部栏：用 Grid 三列布局，左=汉堡按钮，中=logo+标题，右=Popup -->
+            <materialDesign:ColorZone Padding="16"  Mode="Custom"
+                                      Background="White"
+                                      Foreground="#222" DockPanel.Dock="Top">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左侧：菜单按钮 -->
+                    <ToggleButton Grid.Column="0"
+                                  Style="{StaticResource MaterialDesignHamburgerToggleButton}"
+                                  IsChecked="False"
+                                  x:Name="MenuToggleButton"
+                                   Foreground="#222"
+                                  Background="Transparent"
+                                  BorderBrush="{x:Null}"/>
+
+                    <!-- 中间：PNG + 标题 -->
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                        <Image Source="/ForeSITELogo.png"
+                               Width="98" Height="98"
+                               Stretch="Uniform"/>
+                        <TextBlock Text="Alerting Report System"
+                                   FontSize="22"
+                                   Foreground="#222"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"/>
+                    </StackPanel>
+
+                    <!-- 右侧：Popup -->
+                    <materialDesign:PopupBox Grid.Column="2"
+                                             PlacementMode="BottomAndAlignRightEdges"
+                                             StaysOpen="False"
+                                             Foreground="#222"
+                                             Background="White">
+                        <StackPanel>
+                            <Button Content="About"  Foreground="#222"
+                                    Background="#F2F2F2"
+                                    BorderBrush="#DDD"/>
                         </StackPanel>
                     </materialDesign:PopupBox>
-                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="22">ForeSITE Alerting Report System </TextBlock>
-                </DockPanel>
+                </Grid>
             </materialDesign:ColorZone>
-            <ContentControl x:Name="MainContent"  />
 
+            <ContentControl x:Name="MainContent" />
         </DockPanel>
     </ScrollViewer>
-   
 </Window>

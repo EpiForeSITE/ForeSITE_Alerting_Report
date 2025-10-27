@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from pickle import FALSE
 import ssl
 import sys
 import io
@@ -1667,7 +1668,7 @@ def plot_detection_df_full(
         outliers = df_full.loc[alarm_indices]
         if not outliers.empty:
             plt.scatter(outliers.index, outliers['n_cases'],
-                        label='Alarms', zorder=5, s=50)
+                        label='Alerts', zorder=5, s=50)
 
     # Decorations
     plt.legend()
@@ -1729,6 +1730,9 @@ def process_json():
         graph = received_data["graph"]
         safe_log(f"Graph type: {graph}")
 
+        abnormalReportFlag = bool(graph.get("abnormalReportFlag", False))
+        safe_log(f"abnormalReportFlag: {abnormalReportFlag}")
+
         model = graph.get("model", "Farrington")
         datasource = graph.get("dataSource", "Covid-19 Deaths")
         title = graph.get("title", f"{model} Outbreak Detection Simulation")
@@ -1779,7 +1783,7 @@ def process_json():
 
     save_img_path = os.path.join(save_folder, output_plot_path)
 
-    # 7. 根据数据源处理数据
+    # 7. process data by data source and model
     try:
         
         safe_log(datasource)
@@ -1793,7 +1797,16 @@ def process_json():
                         baseline=baseline
                    )
 
-        plot_detection_df_full(
+        def check_recent_abnormal(df_full, threshold):
+            last3 = df_full.tail(3)
+            abnormal = last3[last3["n_cases"] > threshold]
+            return not abnormal.empty
+
+        is_abnormal = check_recent_abnormal(df_full, threshold)
+        safe_log(f"Recent abnormal status: {is_abnormal}")
+
+        if abnormalReportFlag and is_abnormal:
+             plot_detection_df_full(
                   df_full=df_full,
                   predictions=predictions,
                   save_path=save_img_path,
@@ -1801,22 +1814,42 @@ def process_json():
                   xlabel='Date',
                   ylabel='Number of Cases',
                   alpha=0.05
-         )
+             )
+
+             return jsonify({
+                "status": "processed",
+                "abnormal": True,
+                "message": "Abnormal detected; plot generated.",
+                "plot_path": save_img_path
+                }), 200
+        elif not abnormalReportFlag:
+             plot_detection_df_full(
+                  df_full=df_full,
+                  predictions=predictions,
+                  save_path=save_img_path,
+                  plot_title=title,
+                  xlabel='Date',
+                  ylabel='Number of Cases',
+                  alpha=0.05
+             )
+             return jsonify({
+                "status": "processed",
+                "abnormal": False,
+                "message": "No abnormal pattern detected."
+             }), 200
+        else:
+   
+            return jsonify({
+               "status": "success",
+               "abnormal": False,
+               "message": "No abnormal pattern detected."
+            }), 200
+
     except Exception as e:
         safe_log(f"Plot generation error: {e}")
         abort(500, description=f"Plot generation failed: {e}")
 
-    # 8. 返回响应
-    response_data = received_data.copy()
-    response_data.update({
-        'status': 'processed',
-        'message': 'Plot generated successfully.',
-        'plot_path':  save_img_path,
-
-    })
-
-    safe_log(f"Response data: {response_data}")
-    return jsonify(response_data), 200
+   
 
 
 

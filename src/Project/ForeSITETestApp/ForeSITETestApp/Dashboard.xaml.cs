@@ -11,6 +11,7 @@ using Microsoft.VisualBasic;
 using Microsoft.Win32;
 using Microsoft.Xaml.Behaviors.Layout;
 using Newtonsoft.Json.Linq;
+
 using OllamaSharp.Models;
 
 //using PdfSharp.Drawing;
@@ -896,11 +897,13 @@ namespace ForeSITETestApp
                     scheduleFreq = g["freq"]?.ToString() ?? "";
                 }
 
+                bool abnormalReportEnabled = AbnormalReportFlag.IsChecked == true;
 
                 root["schedule"] = new JObject
                 {
                     ["startDate"] = scheduleStart,   // e.g. "2025-09-12"
                     ["frequency"] = scheduleFreq,    // e.g. "By Week"
+                    ["abnormalReportFlag"] = abnormalReportEnabled,
                     ["cron"] = ""
                 };
 
@@ -1854,6 +1857,7 @@ namespace ForeSITETestApp
                 string beginDate = BeginDatePicker.SelectedDate?.ToString("yyyy-MM-dd") ?? "";
                 string freq = (FreqSelector.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "By Week";
                 string threshold = ThresholdInput.Text?.Trim() ?? "";
+                bool abnormalReportEnabled = AbnormalReportFlag.IsChecked == true;
 
                 int? yearsBack = null;
                 int? mcMunu = null;
@@ -1909,7 +1913,8 @@ namespace ForeSITETestApp
                     ["beginDate"] = beginDate,
                     ["freq"] = freq,
                     ["threshold"] = threshold,
-                    ["title"] = plotTitle
+                    ["title"] = plotTitle,
+                    ["abnormalReportFlag"] = abnormalReportEnabled,
                 };
 
                 // 
@@ -1983,150 +1988,166 @@ namespace ForeSITETestApp
                         string? status = responseJson["status"]?.ToString();
                         string? filePath = responseJson["plot_path"]?.ToString();
 
-                        if (status?.ToLower() == "processed" && !string.IsNullOrEmpty(filePath))
+                        bool isAbnormal = false;
+
+                        // read response JSON "abnormal"
+                        if (responseJson.ContainsKey("abnormal"))
                         {
-                            // Validate file existence
-                            var file = filePath;
-                            if (!File.Exists(file))
+                            bool.TryParse(responseJson["abnormal"]?.ToString(), out isAbnormal);
+                        }
+
+                        if (status?.ToLower() == "processed")
+                        {
+                           
+
+                            if ( !string.IsNullOrEmpty(filePath))
                             {
-                                MessageBox.Show($"Plot file not found at '{filePath}'.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                                return;
-                            }
+                                // Validate file existence
+                                var file = filePath;
+                                if (!File.Exists(file))
+                                {
+                                    MessageBox.Show($"Plot file not found at '{filePath}'.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                                    return;
+                                }
 
-                            // Load plot image
-                            var bitmap = new BitmapImage();
-                            bitmap.BeginInit();
-                            bitmap.UriSource = new Uri(file, UriKind.Absolute);
-                            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                            bitmap.EndInit();
+                                // Load plot image
+                                var bitmap = new BitmapImage();
+                                bitmap.BeginInit();
+                                bitmap.UriSource = new Uri(file, UriKind.Absolute);
+                                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                                bitmap.EndInit();
 
-                            // Calculate dynamic image size
-                            double canvasWidth = DrawingCanvas.ActualWidth > 0 ? DrawingCanvas.ActualWidth : 400;
-                            double canvasHeight = DrawingCanvas.ActualHeight > 0 ? DrawingCanvas.ActualHeight : 300;
-                            double maxImageWidth = canvasWidth * 0.8; // 80% of canvas width
-                            double maxImageHeight = canvasHeight * 0.9; // 90% of canvas height (per image)
+                                // Calculate dynamic image size
+                                double canvasWidth = DrawingCanvas.ActualWidth > 0 ? DrawingCanvas.ActualWidth : 400;
+                                double canvasHeight = DrawingCanvas.ActualHeight > 0 ? DrawingCanvas.ActualHeight : 300;
+                                double maxImageWidth = canvasWidth * 0.8; // 80% of canvas width
+                                double maxImageHeight = canvasHeight * 0.9; // 90% of canvas height (per image)
 
-                            // Get image aspect ratio
-                            double aspectRatio = bitmap.PixelWidth > 0 && bitmap.PixelHeight > 0
-                                ? (double)bitmap.PixelWidth / bitmap.PixelHeight
-                                : 4.0 / 3.0; // Default 4:3 if unknown
+                                // Get image aspect ratio
+                                double aspectRatio = bitmap.PixelWidth > 0 && bitmap.PixelHeight > 0
+                                    ? (double)bitmap.PixelWidth / bitmap.PixelHeight
+                                    : 4.0 / 3.0; // Default 4:3 if unknown
 
-                            // Calculate scaled dimensions
-                            double imageWidth = maxImageWidth;
-                            double imageHeight = imageWidth / aspectRatio;
+                                // Calculate scaled dimensions
+                                double imageWidth = maxImageWidth;
+                                double imageHeight = imageWidth / aspectRatio;
 
-                            // Cap height to avoid oversized images
-                            if (imageHeight > maxImageHeight)
-                            {
-                                imageHeight = maxImageHeight;
-                                imageWidth = imageHeight * aspectRatio;
-                            }
+                                // Cap height to avoid oversized images
+                                if (imageHeight > maxImageHeight)
+                                {
+                                    imageHeight = maxImageHeight;
+                                    imageWidth = imageHeight * aspectRatio;
+                                }
 
 
-                            // Add to DrawingCanvas
-                            System.Windows.Controls.Image plotImage = new System.Windows.Controls.Image
-                            {
-                                Source = bitmap,
-                                Width = /*imageWidth*/700,
-                                Height = /*imageHeight*/400,
-                                Stretch = Stretch.Uniform
-                            };
+                                // Add to DrawingCanvas
+                                System.Windows.Controls.Image plotImage = new System.Windows.Controls.Image
+                                {
+                                    Source = bitmap,
+                                    Width = /*imageWidth*/700,
+                                    Height = /*imageHeight*/400,
+                                    Stretch = Stretch.Uniform
+                                };
 
-                            // Create a Border for the image
-                            Border imageBorder = new Border
-                            {
-                                Background = Brushes.White,
-                                BorderThickness = new Thickness(0),
-                                Padding = new Thickness(5),
-                                Width = canvasWidth * 0.9, // 90% of canvas width
-                                Height = /*imageHeight*/400 + 10 // Image height + 5px top/bottom padding
-                            };
+                                // Create a Border for the image
+                                Border imageBorder = new Border
+                                {
+                                    Background = Brushes.White,
+                                    BorderThickness = new Thickness(0),
+                                    Padding = new Thickness(5),
+                                    Width = canvasWidth * 0.9, // 90% of canvas width
+                                    Height = /*imageHeight*/400 + 10 // Image height + 5px top/bottom padding
+                                };
 
-                            // Create a Grid to hold Image and Delete Button
-                            Grid contentGrid = new Grid
-                            {
-                                Margin = new Thickness(0)
-                            };
-                            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                            contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                                // Create a Grid to hold Image and Delete Button
+                                Grid contentGrid = new Grid
+                                {
+                                    Margin = new Thickness(0)
+                                };
+                                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                                contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                                contentGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-                            // Create Delete Button
-                            Button deleteButton = new Button
-                            {
-                                Content = "x",
-                                Width = 20,
-                                Height = 20,
-                                FontSize = 12,
-                                Background = Brushes.Transparent,
-                                BorderBrush = Brushes.Gray,
-                                BorderThickness = new Thickness(1),
-                                Padding = new Thickness(0),
-                                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
-                                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
-                                Cursor = Cursors.Hand
-                            };
+                                // Create Delete Button
+                                Button deleteButton = new Button
+                                {
+                                    Content = "x",
+                                    Width = 20,
+                                    Height = 20,
+                                    FontSize = 12,
+                                    Background = Brushes.Transparent,
+                                    BorderBrush = Brushes.Gray,
+                                    BorderThickness = new Thickness(1),
+                                    Padding = new Thickness(0),
+                                    VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+                                    HorizontalContentAlignment = System.Windows.HorizontalAlignment.Center,
+                                    Cursor = Cursors.Hand
+                                };
 
-                            // Style the button on hover
-                            Style deleteButtonStyle = new Style(typeof(Button));
-                            deleteButtonStyle.Setters.Add(new Setter { Property = Button.BackgroundProperty, Value = Brushes.Transparent });
-                            deleteButtonStyle.Triggers.Add(new Trigger
-                            {
-                                Property = Button.IsMouseOverProperty,
-                                Value = true,
-                                Setters = { new Setter { Property = Button.BackgroundProperty, Value = Brushes.LightGray } }
-                            });
-                            deleteButton.Style = deleteButtonStyle;
+                                // Style the button on hover
+                                Style deleteButtonStyle = new Style(typeof(Button));
+                                deleteButtonStyle.Setters.Add(new Setter { Property = Button.BackgroundProperty, Value = Brushes.Transparent });
+                                deleteButtonStyle.Triggers.Add(new Trigger
+                                {
+                                    Property = Button.IsMouseOverProperty,
+                                    Value = true,
+                                    Setters = { new Setter { Property = Button.BackgroundProperty, Value = Brushes.LightGray } }
+                                });
+                                deleteButton.Style = deleteButtonStyle;
 
-                            // Attach delete functionality
-                            deleteButton.Click += (s, args) =>
-                            {
-                                _reportElements.RemoveAll(re => re.Element == imageBorder);
+                                // Attach delete functionality
+                                deleteButton.Click += (s, args) =>
+                                {
+                                    _reportElements.RemoveAll(re => re.Element == imageBorder);
+                                    RedrawCanvas();
+                                    CheckAndManagePlaceholder();
+                                };
+
+                                // Add Image and Delete Button to Grid
+                                Grid.SetColumn(plotImage, 0);
+                                Grid.SetRow(plotImage, 0);
+                                Grid.SetColumn(deleteButton, 1);
+                                Grid.SetRow(deleteButton, 0);
+                                contentGrid.Children.Add(plotImage);
+                                contentGrid.Children.Add(deleteButton);
+
+                                // Set Grid as Border content
+                                imageBorder.Child = contentGrid;
+
+                                imageBorder.Tag = new JObject
+                                {
+                                    // full parameters（ graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
+                                    ["graph"] = graphData,
+
+
+                                    ["plot_path"] = file,
+
+
+                                    ["title"] = plotTitle
+                                };
+
+                                // Add to report elements
+                                _reportElements.Add(new ReportElement
+                                {
+                                    Type = ReportElementType.Plot,
+                                    Element = imageBorder
+                                });
+
+                                // Redraw canvas
                                 RedrawCanvas();
                                 CheckAndManagePlaceholder();
-                            };
+                                UpdateCanvasHeight();
+                                MessageBox.Show($"Plot '{plotTitle}' added for model {model} from '{filePath}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                            // Add Image and Delete Button to Grid
-                            Grid.SetColumn(plotImage, 0);
-                            Grid.SetRow(plotImage, 0);
-                            Grid.SetColumn(deleteButton, 1);
-                            Grid.SetRow(deleteButton, 0);
-                            contentGrid.Children.Add(plotImage);
-                            contentGrid.Children.Add(deleteButton);
-
-                            // Set Grid as Border content
-                            imageBorder.Child = contentGrid;
-
-                            imageBorder.Tag = new JObject
+                            }
+                            else
                             {
-                                // full parameters（ graphData：Model/DataSource/YearBack/UseTrainSplit/BeginDate/Freq/Threshold/Title...）
-                                ["graph"] = graphData,
-
-
-                                ["plot_path"] = file,
-
-
-                                ["title"] = plotTitle
-                            };
-
-                            // Add to report elements
-                            _reportElements.Add(new ReportElement
-                            {
-                                Type = ReportElementType.Plot,
-                                Element = imageBorder
-                            });
-
-                            // Redraw canvas
-                            RedrawCanvas();
-                            CheckAndManagePlaceholder();
-                            UpdateCanvasHeight();
-                            MessageBox.Show($"Plot '{plotTitle}' added for model {model} from '{filePath}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
-
-
+                                MessageBox.Show($"No plot into the report: {responseJson}.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
                         else
                         {
-                            MessageBox.Show($"Server response missing 'ready' status or 'file' path. Response: {responseContent}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            MessageBox.Show($"No abnormality detected recently; plot not added to the report.", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                     }
                     catch (Newtonsoft.Json.JsonException)

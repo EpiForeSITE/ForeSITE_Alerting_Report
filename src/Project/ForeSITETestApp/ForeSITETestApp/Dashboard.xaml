@@ -68,20 +68,66 @@
         </Grid.ColumnDefinitions>
 
         <!-- Sidebar -->
-        <Border Background="#2C3E50" Grid.Column="0">
+        <Border Background="White" Grid.Column="0" BorderBrush="#DDD" BorderThickness="0,0,1,0">
             <StackPanel Margin="10">
+
                 <!-- Logo or Title -->
-                <TextBlock Text="Dashboard" Foreground="White" FontSize="20" FontWeight="Bold" Margin="10,20,10,30"/>
+                <TextBlock Text="Dashboard"
+                   Foreground="#222"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Margin="10,20,10,30"/>
 
                 <!-- Navigation Menu -->
-                <Button x:Name="HomeButton" Content="Home" Style="{StaticResource NavButtonStyle}" Margin="5" Click="HomeButton_Click"/>
-                <Button x:Name="SchedulerButton" Content="Scheduler" Style="{StaticResource NavButtonStyle}" Margin="5" Click="SchedulerButton_Click"/>
-                <Button x:Name="ReportButton" Content="Reporter" Style="{StaticResource NavButtonStyle}" Margin="5" Click="ReportButton_Click"/>
-                <Button x:Name="DataSourceButton" Content="Data Source Manager" Style="{StaticResource NavButtonStyle}" Margin="5" Click="DataSourceButton_Click"/>
-                <Button x:Name="ModelButton" Content="Model Manager" Style="{StaticResource NavButtonStyle}" Margin="5" Click="ModelButton_Click"/>
-                <Button x:Name="SettingButton" Content="Settings" Style="{StaticResource NavButtonStyle}" Margin="5"/>
+                <Button x:Name="HomeButton"
+                Content="Home"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"
+                Click="HomeButton_Click"/>
+
+                <Button x:Name="SchedulerButton"
+                Content="Scheduler"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"
+                Click="SchedulerButton_Click"/>
+
+                <Button x:Name="ReportButton"
+                Content="Reporter"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"
+                Click="ReportButton_Click"/>
+
+                <Button x:Name="DataSourceButton"
+                Content="Data Source Manager"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"
+                Click="DataSourceButton_Click"/>
+
+                <Button x:Name="ModelButton"
+                Content="Model Manager"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"
+                Click="ModelButton_Click"/>
+
+                <Button x:Name="SettingButton"
+                Content="Settings"
+                Style="{StaticResource NavButtonStyle}"
+                Margin="5"
+                Foreground="#333"
+                Background="Transparent"/>
             </StackPanel>
         </Border>
+
 
         <!-- Main Content Area -->
         <Grid Grid.Column="1">
@@ -96,6 +142,7 @@
                     <TextBlock x:Name="HeaderTitle" Text="Home" FontSize="18" FontWeight="Bold" Foreground="#2C3E50" VerticalAlignment="Center" Margin="10,0,0,0" DockPanel.Dock="Left"/>
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right"  Margin="10">
                         <TextBlock Text="User " VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Button x:Name="AddNotebookButton" Content="Data Analysis"  Margin="0,0,10,0" Click="AddNotebookButton_Click" />
                         <Button x:Name="AIButton"  Content="AI Helper"  Margin="0,0,10,0" Click="AIButton_Click"/>
                         <Button Content="Close" />
                     </StackPanel>
@@ -382,12 +429,21 @@
                                         <TextBox x:Name="ThresholdInput" Width="150" HorizontalAlignment="Left" />
                                     </StackPanel>
 
+                                    <StackPanel Grid.Row="1" Grid.Column="3" Margin="10,0,0,0">
+                                        
+                                        <CheckBox x:Name="AbnormalReportFlag"
+                                         Content="Abnormal Report Only"
+                                         IsChecked="True"
+                                         Width="180"
+                                         HorizontalAlignment="Left"/>
+                                    </StackPanel>
+
                                     <!-- Action Buttons -->
                                     <StackPanel Grid.Row="0" Grid.Column="4" Grid.RowSpan="3" Orientation="Vertical" Margin="10,0,0,0" VerticalAlignment="Center">
                                         <Button x:Name="AddTitleButton" Content="Add Title"  Margin="0,0,0,10" Click="AddTitleButton_Click" />
                                         <Button x:Name="AddCommentButton" Content="Add Comment"  Margin="0,0,0,10" Click="AddCommentButton_Click" />
                                         <Button x:Name="AddPlotButton" Content="Add Plot" Margin="0,0,0,10" Click="AddPlotButton_ClickAsync" />
-                                        <Button x:Name="AddNotebookButton" Content="Data Analysis"   Click="AddNotebookButton_Click" />
+                                       
                                     </StackPanel>
                                 </Grid>
                             </Border>

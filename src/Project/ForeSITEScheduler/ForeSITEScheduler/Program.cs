@@ -51,9 +51,9 @@ internal static class Program
         {
             BaseAddress = new Uri(SERVER_BASE_URL),
      //#if DEBUG
-            Timeout = Timeout.InfiniteTimeSpan,    // Debug 时：不超时
+            Timeout = Timeout.InfiniteTimeSpan,    // Debug 
      //#else
-     //       Timeout = TimeSpan.FromSeconds(15),    // Release：合理超时
+     //       Timeout = TimeSpan.FromSeconds(15),    // Release
      //#endif
         };
     }
@@ -176,7 +176,14 @@ internal static class Program
                 template["__sourcePath"] = task.AttachmentPath;
 
                 // 
-                string pdfOut = await ProcessTemplateAsync(template);
+                string? pdfOut = await ProcessTemplateAsync(template);
+               
+
+                if (string.IsNullOrEmpty(pdfOut))
+                {
+                    WriteLine("  ℹ️ No abnormal pattern. Skip PDF and email.");
+                    continue; // 
+                }
                 WriteLine($"  ✅ PDF generated: {pdfOut}");
 
                 // === email ===
@@ -491,14 +498,18 @@ internal static class Program
 
     // ====================================
 
-    private static async Task<string> ProcessTemplateAsync(JObject template)
+    private static async Task<string?> ProcessTemplateAsync(JObject template)
     {
         // read schedule
         string scheduleStart = template["schedule"]?["startDate"]?.ToString() ?? DateTime.Today.ToString("yyyy-MM-dd");
         string scheduleFreq = template["schedule"]?["frequency"]?.ToString() ?? "By Day";
 
+        bool abnormalReportFlag = template["schedule"]?["abnormalReportFlag"]?.ToObject<bool>() ?? false;
+
+
         // ordered items
         var items = new List<DocItem>();
+        bool anyAbnormal = false;
 
         var layout = template["layout"] as JArray ?? new JArray();
         foreach (var tok in layout.OfType<JObject>())
@@ -523,23 +534,29 @@ internal static class Program
                 var param = tok["params"] as JObject ?? new JObject();
                 param["beginDate"] = scheduleStart;
 
-                string? imgPath = await RequestPlotAsync(param);
-                if (!string.IsNullOrWhiteSpace(imgPath) && File.Exists(imgPath))
+                param["abnormalReportFlag"] = abnormalReportFlag;
+
+                var resp = await RequestPlotAsync(param);
+                if (resp!=null && resp.Abnormal && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
                 {
-                    byte[] png = await File.ReadAllBytesAsync(imgPath);
+                    anyAbnormal = true;
+                    byte[] png = await File.ReadAllBytesAsync(resp.PlotPath!);
                     items.Add(new DocItem(DocItemType.Image, ImageBytes: png));
                 }
             }
             // else ignore unknown type such as add Table in the future
         }
 
+        if (!anyAbnormal)
+            return null;
+
         string outputPdf = GetOutputPdfPath(template);
         await GeneratePdfAsync(outputPdf, items);
         return outputPdf;
     }
 
-    // Program.cs
-    static async Task<string?> RequestPlotAsync(JObject graphParams)
+    private record PlotResponse(bool Abnormal, string? PlotPath);
+    static async Task<PlotResponse?> RequestPlotAsync(JObject graphParams)
     {
         var body = new JObject { ["graph"] = graphParams };
         using var content = new StringContent(body.ToString(), Encoding.UTF8, "application/json");
@@ -551,8 +568,20 @@ internal static class Program
         var txt = await resp.Content.ReadAsStringAsync(cts.Token);
         var jo = JObject.Parse(txt);
 
-        // compatibility: plot_path or file
-        return jo["plot_path"]?.ToString() ?? jo["file"]?.ToString();
+        string? status = jo["status"]?.ToString();
+        string? filePath = jo["plot_path"]?.ToString();
+
+        bool isAbnormal = jo.ContainsKey("abnormal") &&
+                  bool.TryParse(jo["abnormal"]?.ToString(), out var flag) && flag;
+
+        if (status?.ToLower() == "processed"  && !string.IsNullOrEmpty(filePath))
+        {
+            return new PlotResponse(true, filePath);
+        }
+        else
+        {
+            return new PlotResponse(false, null);
+        }
     }
 
 
