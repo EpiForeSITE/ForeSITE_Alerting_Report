@@ -93,7 +93,7 @@ namespace ForeSITETestApp
         {
             bool exists = TaskExists(TaskName);
 
-            // 如果任务存在，禁用 Start，启用 End
+            
             BtnStart.IsEnabled = !exists;
             BtnEnd.IsEnabled = exists;
         }
@@ -1414,7 +1414,7 @@ namespace ForeSITETestApp
             public FlowDocument Document { get; set; } = new FlowDocument();
         }
 
-        // deep copy FlowDocument，avoid UI与存档引用同一个对象
+        // deep copy FlowDocument
         private static FlowDocument CloneFlowDocument(FlowDocument source)
         {
             if (source == null) return new FlowDocument();
