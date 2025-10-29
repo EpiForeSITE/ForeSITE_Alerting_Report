@@ -537,7 +537,7 @@ internal static class Program
                 param["abnormalReportFlag"] = abnormalReportFlag;
 
                 var resp = await RequestPlotAsync(param);
-                if (resp!=null && resp.Abnormal && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
+                if (resp!=null  && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
                 {
                     anyAbnormal = true;
                     byte[] png = await File.ReadAllBytesAsync(resp.PlotPath!);
