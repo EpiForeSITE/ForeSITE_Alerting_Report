@@ -57,9 +57,9 @@ namespace SchedulerRunner
 
                 using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = @"PRAGMA journal_mode=WAL;      -- 只需设置一次，库级别
-                                        PRAGMA synchronous=NORMAL;     -- 性能/可靠性折中
-                                        PRAGMA busy_timeout=5000;"; //--5 秒等待写锁
+                    cmd.CommandText = @"PRAGMA journal_mode=WAL;      
+                                        PRAGMA synchronous=NORMAL;     
+                                        PRAGMA busy_timeout=5000;"; //--5 seconds
                     cmd.ExecuteNonQuery();
                 }
 
