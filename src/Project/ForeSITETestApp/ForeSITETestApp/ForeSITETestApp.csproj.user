@@ -7,9 +7,6 @@
     <Compile Update="ChatDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Update="Dashboard.xaml.cs">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Update="PlotTitleDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>

@@ -166,7 +166,7 @@ namespace ForeSITETestApp
     
         private void SchedulerButton_Click(object sender, RoutedEventArgs e)
         {
-            HeaderTitle.Text = "Schedule Builder";
+            HeaderTitle.Text = "Schedule Management";
             DefaultContentGrid.Visibility = Visibility.Collapsed;
             SchedulerGrid.Visibility = Visibility.Visible;
             ReportsGrid.Visibility = Visibility.Collapsed;
@@ -236,7 +236,7 @@ namespace ForeSITETestApp
 
         private void DataSourceButton_Click(object sender, RoutedEventArgs e)
         {
-            HeaderTitle.Text = "Data Source Builder";
+            HeaderTitle.Text = "Data Source Management";
             DefaultContentGrid.Visibility = Visibility.Collapsed;
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
@@ -590,8 +590,8 @@ namespace ForeSITETestApp
             var saveButton = new Button
             {
                 Content = "💾 Save Data Source",
-                Style = FindResource("HeaderButtonStyle") as Style,
-                Width = 150,
+                //Style = FindResource("HeaderButtonStyle") as Style,
+                Width = 180,
                 Margin = new Thickness(0, 0, 10, 0)
             };
 
@@ -2485,7 +2485,7 @@ namespace ForeSITETestApp
 
                 if (exit == 0)
                 {
-                    MessageBox.Show($"Task '{TaskName}' created successfully to run daily at {startTime}.\n{stdout}",
+                    MessageBox.Show($"Task '{TaskName}' was successfully set to run daily at {startTime}.",
                                     "Scheduler", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
@@ -2519,7 +2519,7 @@ namespace ForeSITETestApp
 
                 if (exit == 0)
                 {
-                    MessageBox.Show($"Task '{TaskName}' deleted successfully.\n{stdout}",
+                    MessageBox.Show($"Task '{TaskName}' was deleted successfully.",
                                     "Scheduler", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else

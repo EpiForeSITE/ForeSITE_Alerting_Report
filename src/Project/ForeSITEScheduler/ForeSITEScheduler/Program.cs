@@ -1,5 +1,6 @@
 ﻿using ForeSITEScheduler;
 using Newtonsoft.Json.Linq;
+using Org.BouncyCastle.Utilities;
 using QuestPDF.Fluent;
 using SchedulerRunner;
 using System;
@@ -195,7 +196,7 @@ internal static class Program
                         var smtp = SmtpConfig.LoadSmtpConfig();
                         Console.WriteLine($"  Using SMTP server: {smtp.Host}:{smtp.Port}, SSL={smtp.EnableSsl}, User={smtp.Username}");
                         string subject = $"Automated Report - {DateTime.Now:yyyy-MM-dd}";
-                        string body = "Please find the attached report.\n\n(This email was sent automatically.)";
+                        string body = "Please find the attached report.\n\n(This email was sent automatically.)\n\nJob name:"+ task.Id.ToString();
 
                         await SmtpConfig.SendReportEmailAsync(smtp, recipients, subject, body, pdfOut);
                         WriteLine($"  📧 Email sent to: {string.Join(", ", recipients)}");
@@ -537,7 +538,7 @@ internal static class Program
                 param["abnormalReportFlag"] = abnormalReportFlag;
 
                 var resp = await RequestPlotAsync(param);
-                if (resp!=null && resp.Abnormal && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
+                if (resp!=null  && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
                 {
                     anyAbnormal = true;
                     byte[] png = await File.ReadAllBytesAsync(resp.PlotPath!);
