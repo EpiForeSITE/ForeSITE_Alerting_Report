@@ -16,10 +16,11 @@
             </ResourceDictionary.MergedDictionaries>
             <Style x:Key="NavButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="Transparent"/>
-                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Foreground" Value="#333"/>
                 <Setter Property="Padding" Value="10"/>
                 <Setter Property="Margin" Value="5"/>
                 <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <Setter Property="Template">
                     <Setter.Value>
@@ -29,13 +30,14 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#34495E"/>
+                                    <Setter Property="Background" Value="#E6E6E6"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
             </Style>
+
 
             <Style x:Key="HeaderButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="#3498DB"/>
@@ -124,7 +126,8 @@
                 Style="{StaticResource NavButtonStyle}"
                 Margin="5"
                 Foreground="#333"
-                Background="Transparent"/>
+                Background="Transparent"
+                Click="SetupButton_Click"/>
             </StackPanel>
         </Border>
 
@@ -510,11 +513,11 @@
                         </Grid.ColumnDefinitions>
 
 
-
+                       <!--
                         <StackPanel Grid.Column="0" Orientation="Horizontal">
                             <Button x:Name="btnAddNewModel" Content="Add Model" Margin="5" Padding="8,3" Click="btnAddModel_Click"/>
                             <Button x:Name="btnDeleteModel" Content="Delete Model" Margin="5" Padding="8,3" Click="btnDeleteModel_Click"/>
-                        </StackPanel>
+                        </StackPanel> -->
                     </Grid>
                     <!-- middle -->
                     <Grid Grid.Row="1">
@@ -602,11 +605,11 @@
                                     </Grid.ColumnDefinitions>
 
                                     <TextBlock Grid.Column="0" Text="Property" FontWeight="Bold"/>
-
+                                    <!--
                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                         <Button x:Name="btnAddProperty" Content="Add Property" Margin="5,0" Padding="8,3" Click="btnAddProperty_Click"/>
                                         <Button x:Name="btnDeleteProperty" Content="Del Property" Margin="5,0" Padding="8,3" Click="btnDeleteProperty_Click"/>
-                                    </StackPanel>
+                                    </StackPanel> -->
                                 </Grid>
 
                                 <DataGrid Grid.Row="1" x:Name="dgProperties" Margin="0,5,0,0" AutoGenerateColumns="False" 
@@ -640,6 +643,60 @@
                         </Grid>
                     </Grid>
                 </Grid>
+                <!-- Setup Grid -->
+                <Grid x:Name="SetupGrid" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="LLM Configuration"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="#222"
+                               Margin="0,0,0,16"/>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="Base URL:"
+                                   Width="140"
+                                   VerticalAlignment="Center"
+                                   Foreground="#333"
+                                   FontSize="14"/>
+                        <TextBox x:Name="LlmBaseUrlBox"
+                                 Width="420"
+                                 Height="30"
+                                 VerticalContentAlignment="Center"
+                                 Text=""/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="API Key:"
+                                   Width="140"
+                                   VerticalAlignment="Center"
+                                   Foreground="#333"
+                                   FontSize="14"/>
+                        <PasswordBox x:Name="LlmApiKeyBox"
+                                     Width="420"
+                                     Height="30"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal">
+                        <Button Content="Save"
+                                Width="120"
+                                Height="34"
+                                Margin="0,0,10,0"
+                                Cursor="Hand"
+                                Click="SaveLlmConfig_Click"/>
+                        <TextBlock x:Name="LlmConfigStatusText"
+                                   VerticalAlignment="Center"
+                                   Foreground="#2E7D32"
+                                   FontSize="13"/>
+                    </StackPanel>
+                </Grid>
+
 
             </Grid>
         </Grid>

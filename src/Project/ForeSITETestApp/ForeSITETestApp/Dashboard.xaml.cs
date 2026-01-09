@@ -28,6 +28,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -93,7 +94,7 @@ namespace ForeSITETestApp
         {
             bool exists = TaskExists(TaskName);
 
-            
+            // if task exists，disable Start，start End
             BtnStart.IsEnabled = !exists;
             BtnEnd.IsEnabled = exists;
         }
@@ -172,6 +173,7 @@ namespace ForeSITETestApp
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
+            SetupGrid.Visibility = Visibility.Collapsed;
         }
 
         // Helper method to refresh just the data source count
@@ -206,6 +208,7 @@ namespace ForeSITETestApp
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
             RefreshDataSourceCount();
+            SetupGrid.Visibility = Visibility.Collapsed;
         }
 
         private void UpdateDataSourceCountDisplay()
@@ -232,6 +235,7 @@ namespace ForeSITETestApp
             ReportsGrid.Visibility = Visibility.Visible;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
+            SetupGrid.Visibility = Visibility.Collapsed;
         }
 
         private void DataSourceButton_Click(object sender, RoutedEventArgs e)
@@ -242,6 +246,7 @@ namespace ForeSITETestApp
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Visible;
             ModelGrid.Visibility = Visibility.Collapsed;
+            SetupGrid.Visibility = Visibility.Collapsed;
         }
 
         private void ModelButton_Click(object sender, RoutedEventArgs e)
@@ -252,6 +257,7 @@ namespace ForeSITETestApp
             ReportsGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Visible;
+            SetupGrid.Visibility = Visibility.Collapsed;
         }
 
         private async void LoadDataButton_Click(object sender, RoutedEventArgs e)
@@ -1414,7 +1420,7 @@ namespace ForeSITETestApp
             public FlowDocument Document { get; set; } = new FlowDocument();
         }
 
-        // deep copy FlowDocument
+        // deep copy FlowDocument，avoid UI与存档引用同一个对象
         private static FlowDocument CloneFlowDocument(FlowDocument source)
         {
             if (source == null) return new FlowDocument();
@@ -2604,5 +2610,89 @@ namespace ForeSITETestApp
             if (panelToShow != null)
                 panelToShow.Visibility = Visibility.Visible;
         }
+
+        private void SetupButton_Click(object sender, RoutedEventArgs e)
+        {
+            HeaderTitle.Text = "Setup";
+            DefaultContentGrid.Visibility = Visibility.Collapsed;
+            SchedulerGrid.Visibility = Visibility.Collapsed;
+            ReportsGrid.Visibility = Visibility.Collapsed;
+            DataSourceGrid.Visibility = Visibility.Collapsed;
+            ModelGrid.Visibility = Visibility.Collapsed;
+
+            SetupGrid.Visibility = Visibility.Visible;
+
+            LoadLlmConfigIntoUi();
+        }
+
+        // ---------------------------
+        // Setup (LLM config)
+        // ---------------------------
+        private const string LlmConfigFileName = "llm_config.json";
+
+        private sealed class LlmConfig
+        {
+            public string baseUrl { get; set; } = "";
+            public string apiKey { get; set; } = "";
+        }
+
+        private string GetLlmConfigPath()
+        {
+            // keep it next to the exe so Task Scheduler / installed app can find it consistently
+            return Path.Combine(AppContext.BaseDirectory, LlmConfigFileName);
+        }
+
+        private void LoadLlmConfigIntoUi()
+        {
+            try
+            {
+                string path = GetLlmConfigPath();
+                if (!File.Exists(path))
+                    return;
+
+                var cfg = JsonSerializer.Deserialize<LlmConfig>(File.ReadAllText(path));
+                if (cfg == null) return;
+
+                if (LlmBaseUrlBox != null) LlmBaseUrlBox.Text = cfg.baseUrl ?? "";
+                if (LlmApiKeyBox != null) LlmApiKeyBox.Password = cfg.apiKey ?? "";
+            }
+            catch (Exception ex)
+            {
+                // non-fatal
+                Debug.WriteLine($"LoadLlmConfigIntoUi error: {ex.Message}");
+            }
+        }
+
+        private void SaveLlmConfig_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var cfg = new LlmConfig
+                {
+                    baseUrl = LlmBaseUrlBox?.Text?.Trim() ?? "",
+                    apiKey = LlmApiKeyBox?.Password?.Trim() ?? ""
+                };
+
+                string json = JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(GetLlmConfigPath(), json);
+
+                if (LlmConfigStatusText != null)
+                {
+                    LlmConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50)); // green-ish
+                    LlmConfigStatusText.Text = $"Saved to {LlmConfigFileName}";
+                }
+            }
+            catch (Exception ex)
+            {
+                if (LlmConfigStatusText != null)
+                {
+                    LlmConfigStatusText.Foreground = Brushes.DarkRed;
+                    LlmConfigStatusText.Text = ex.Message;
+                }
+                MessageBox.Show($"Failed to save LLM config: {ex.Message}", "Setup",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
     }
 }
