@@ -27,10 +27,10 @@ namespace ForeSITETestApp
 
     public class ModelProperty : INotifyPropertyChanged
     {
-        private string _name;
-        private string _type;
-        private string _defaultValue;
-        private string _title;
+        private string _name = string.Empty;
+        private string _type = string.Empty;
+        private string _defaultValue = string.Empty;
+        private string _title = string.Empty;
 
         public string Name
         {
@@ -86,7 +86,7 @@ namespace ForeSITETestApp
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string name)
         {
@@ -96,14 +96,14 @@ namespace ForeSITETestApp
 
     public class Model : INotifyPropertyChanged
     {
-        private string _name;
-        private string _fullname;
-        private string _type;
-        private string _description;
+        private string _name = string.Empty;
+        private string _fullname = string.Empty;
+        private string _type = string.Empty;
+        private string _description = string.Empty;
         private bool _enabled;
-        private ObservableCollection<ModelProperty> _properties;
-        private string _createdDate;
-        private string _lastUpdated;
+        private ObservableCollection<ModelProperty> _properties = new ObservableCollection<ModelProperty>();
+        private string _createdDate = string.Empty;
+        private string _lastUpdated = string.Empty;
 
         public string Name
         {
@@ -222,7 +222,7 @@ namespace ForeSITETestApp
             Properties = new ObservableCollection<ModelProperty>();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string name)
         {
@@ -301,17 +301,17 @@ namespace ForeSITETestApp
 
     public class NotebookCell
     {
-        public string CellType { get; set; }
+        public string CellType { get; set; } = string.Empty;
 
-        public string Language { get; set; }
-        public string Source { get; set; }
-        public string Output { get; set; }
+        public string Language { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+        public string Output { get; set; } = string.Empty;
     }
 
     public class NotebookDocument
     {
-        public List<NotebookCell> Cells { get; set; }
-        public Dictionary<string, object> Metadata { get; set; }
+        public List<NotebookCell> Cells { get; set; } = new List<NotebookCell>();
+        public Dictionary<string, object> Metadata { get; set; } = new Dictionary<string, object>();
     }
 
 
@@ -428,7 +428,7 @@ namespace ForeSITETestApp
         public string PlotPath { get; set; } = "";
 
         [JsonProperty("graph")]
-        public GraphParameters Graph { get; set; }
+        public GraphParameters Graph { get; set; } = new GraphParameters();
     }
 
     /// <summary>

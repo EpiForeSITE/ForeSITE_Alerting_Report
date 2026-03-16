@@ -20,8 +20,8 @@ namespace ForeSITETestApp
     /// </summary>
     public partial class PlotTitleDialog : UserControl
     {
-        private Window _window;
-        public string PlotTitle { get; private set; }
+        private readonly Window _window;
+        public string? PlotTitle { get; private set; }
 
         public PlotTitleDialog()
         {

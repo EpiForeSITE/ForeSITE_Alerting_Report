@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 
 using Microsoft.Data.Sqlite;
+using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -15,6 +16,7 @@ using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using WinForms = System.Windows.Forms;
 
 
 namespace ForeSITETestApp;
@@ -142,6 +144,12 @@ public partial class MainWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        if (!EnsureEnvironmentInitialized())
+        {
+            Close();
+            return;
+        }
+
         await StartFlaskAndSendRequestAsync();
     }
 
@@ -229,13 +237,17 @@ public partial class MainWindow : Window
                 RedirectStandardError = true
             };
 
-            using (Process taskKill = Process.Start(taskKillInfo))
+            using Process? taskKill = Process.Start(taskKillInfo);
+            if (taskKill == null)
             {
-                taskKill.WaitForExit();
-                if (taskKill.ExitCode != 0)
-                {
-                    Console.WriteLine($"taskkill failed with exit code {taskKill.ExitCode}");
-                }
+                Console.WriteLine("Failed to start taskkill process.");
+                return;
+            }
+
+            taskKill.WaitForExit();
+            if (taskKill.ExitCode != 0)
+            {
+                Console.WriteLine($"taskkill failed with exit code {taskKill.ExitCode}");
             }
         }
         catch (Exception ex)
@@ -259,6 +271,132 @@ public partial class MainWindow : Window
         {
             // Convert relative path to absolute path based on base directory
             return Path.Combine(baseDirectory, configPath);
+        }
+    }
+
+    private string GetConfigPath()
+    {
+        string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+        string serverDirectory = Path.Combine(baseDirectory, "Server");
+        Directory.CreateDirectory(serverDirectory);
+        return Path.Combine(serverDirectory, "config.json");
+    }
+
+    private static bool IsConfigInitialized(JObject config)
+    {
+        JToken? initializedToken = config["initialized"] ?? config["Initialized"];
+        return initializedToken?.Type == JTokenType.Boolean && initializedToken.Value<bool>();
+    }
+
+    private static bool TryGetRHomeFromExePath(string rExePath, out string rHome)
+    {
+        rHome = string.Empty;
+        string? rExeDirectory = Path.GetDirectoryName(rExePath);
+        if (string.IsNullOrWhiteSpace(rExeDirectory))
+            return false;
+
+        // If user selected ...\bin\R.exe, use parent folder as R_HOME.
+        if (string.Equals(Path.GetFileName(rExeDirectory), "bin", StringComparison.OrdinalIgnoreCase))
+        {
+            var parent = Directory.GetParent(rExeDirectory);
+            if (parent == null)
+                return false;
+
+            rHome = parent.FullName;
+            return true;
+        }
+
+        // Otherwise treat selected exe directory as R_HOME.
+        rHome = rExeDirectory;
+        return true;
+    }
+
+    private string ResolveRHomePath(string baseDirectory, string configuredRPath)
+    {
+        string resolved = ResolvePath(baseDirectory, configuredRPath);
+
+        // If RPath is an exe path (e.g. ...\bin\R.exe), derive R_HOME from it.
+        if (string.Equals(Path.GetExtension(resolved), ".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            if (TryGetRHomeFromExePath(resolved, out string rHomeFromExe))
+                return rHomeFromExe;
+        }
+
+        return resolved;
+    }
+
+    private bool EnsureEnvironmentInitialized()
+    {
+        try
+        {
+            string configPath = GetConfigPath();
+            JObject config;
+
+            if (File.Exists(configPath))
+            {
+                string raw = File.ReadAllText(configPath);
+                config = string.IsNullOrWhiteSpace(raw) ? new JObject() : JObject.Parse(raw);
+            }
+            else
+            {
+                config = new JObject();
+            }
+
+            if (IsConfigInitialized(config))
+                return true;
+
+            MessageBox.Show(
+                "Environment is not initialized. Please select the Python environment folder.",
+                "Initial Setup",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            using var pythonDialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Select the Python environment folder (it should contain python.exe, Scripts\\activate.bat and Lib\\R)."
+            };
+
+            if (pythonDialog.ShowDialog() != WinForms.DialogResult.OK)
+                return false;
+
+            string pythonFolder = pythonDialog.SelectedPath;
+            string pythonPath = Path.Combine(pythonFolder, "python.exe");
+            if (!File.Exists(pythonPath))
+            {
+                MessageBox.Show("python.exe was not found in the selected folder.", "Initial Setup", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            string rHomePath = Path.Combine(pythonFolder, "Lib", "R");
+            if (!Directory.Exists(rHomePath))
+            {
+                MessageBox.Show("R folder was not found at Lib\\R under the selected Python environment folder.", "Initial Setup", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            string activateCommand = Path.Combine(pythonFolder, "Scripts", "activate.bat");
+            if (!File.Exists(activateCommand))
+            {
+                MessageBox.Show("activate.bat was not found at Scripts\\activate.bat under the selected Python environment folder.", "Initial Setup", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            config["pythonPath"] = pythonPath;
+            config["RPath"] = rHomePath;
+            config["activateCommand"] = activateCommand;
+            config["initialized"] = true;
+            //config["Initialized"] = true;
+
+            File.WriteAllText(configPath, config.ToString());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to initialize environment.\n{ex.Message}",
+                            "Initial Setup",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+            return false;
         }
     }
 
@@ -292,7 +430,7 @@ public partial class MainWindow : Window
         // Get the current execution directory
         string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
         string serverDirectory = Path.Combine(baseDirectory, "Server");
-        string configPath = Path.Combine(serverDirectory, "config.json");
+        string configPath = GetConfigPath();
 
         dynamic config = new
         {
@@ -323,7 +461,7 @@ public partial class MainWindow : Window
 
         // Resolve all paths
         string pythonPath = ResolvePath(baseDirectory, (string)config.pythonPath);
-        string rPath = ResolvePath(baseDirectory,(string)config.RPath);
+        string rPath = ResolveRHomePath(baseDirectory, (string)config.RPath);
         string serverPath = ResolvePath(serverDirectory,(string)config.serverPath);
         string activateCommand = ResolvePath(baseDirectory, (string)config.activateCommand);
 

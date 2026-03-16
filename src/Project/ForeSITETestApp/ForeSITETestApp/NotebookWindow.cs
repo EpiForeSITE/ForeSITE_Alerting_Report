@@ -20,16 +20,16 @@ namespace ForeSITETestApp
     // Enhanced NotebookWindow class
     public class NotebookWindow : Window
     {
-        private StackPanel _cellContainer;
-        private string _savePath;
+        private StackPanel _cellContainer = null!;
+        private string _savePath = string.Empty;
         internal NotebookClient _notebookClient; // Made internal so NamespaceWindow can access it
         private bool _rAvailable = false;
 
-        private ComboBox _dataSourceComboBox;
-        private TextBox _variableNameTextBox;
-        private TextBox _thresholdTextBox;
-        private Button _addVariableButton;
-        private Button _addRButton;
+        private ComboBox _dataSourceComboBox = null!;
+        private TextBox _variableNameTextBox = null!;
+        private TextBox _thresholdTextBox = null!;
+        private Button _addVariableButton = null!;
+        private Button _addRButton = null!;
         private DataSourcesResult _dataSourcesResult = new DataSourcesResult();
 
 
@@ -329,8 +329,14 @@ namespace ForeSITETestApp
                 _addVariableButton.IsEnabled = false;
                 _addVariableButton.Content = "⏳ Adding...";
 
-                var selectedItem = (ComboBoxItem)_dataSourceComboBox.SelectedItem;
-                var dataSource = ((DataSource)selectedItem.Tag)?.Name;
+                var selectedItem = _dataSourceComboBox.SelectedItem as ComboBoxItem;
+                var dataSource = (selectedItem?.Tag as DataSource)?.Name;
+                if (string.IsNullOrWhiteSpace(dataSource))
+                {
+                    MessageBox.Show("Selected data source is invalid.", "Validation Error",
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
                 // Add variable to namespace
                 var result = await _notebookClient.AddVariableAsync(dataSource, variableName, threshold);
@@ -1527,7 +1533,7 @@ namespace ForeSITETestApp
                     };
                     namespaceWindow.ShowDialog();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Ensure loading window is closed
                     loadingWindow?.Close();
@@ -1761,6 +1767,12 @@ namespace ForeSITETestApp
 
                     _cellContainer.Children.Clear();
 
+                    if (notebook?.Cells == null)
+                    {
+                        MessageBox.Show("Notebook file is empty or invalid.", "Load Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
                     foreach (var cell in notebook.Cells)
                     {
                         if (cell.CellType == "code")
@@ -1904,9 +1916,9 @@ namespace ForeSITETestApp
     /// </summary>
     public class NamespaceWindow : Window
     {
-        private ListView _variablesList;
-        private TextBox _searchBox;
-        private List<VariableDisplayItem> _allVariables;
+        private ListView _variablesList = null!;
+        private TextBox _searchBox = null!;
+        private List<VariableDisplayItem> _allVariables = new();
 
         public NamespaceWindow(NamespaceInfo namespaceInfo)
         {

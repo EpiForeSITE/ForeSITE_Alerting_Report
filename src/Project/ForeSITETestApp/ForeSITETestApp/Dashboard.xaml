@@ -645,56 +645,108 @@
                 </Grid>
                 <!-- Setup Grid -->
                 <Grid x:Name="SetupGrid" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                    <TabControl>
+                        <TabItem Header="System Config">
+                            <Grid Margin="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0"
-                               Text="LLM Configuration"
-                               FontSize="20"
-                               FontWeight="SemiBold"
-                               Foreground="#222"
-                               Margin="0,0,0,16"/>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <TextBlock Text="config.json Parameters"
+                                               FontSize="18"
+                                               FontWeight="SemiBold"
+                                               Foreground="#222"
+                                               VerticalAlignment="Center"/>
+                                    <Button Content="Refresh"
+                                            Width="90"
+                                            Height="30"
+                                            Margin="16,0,0,0"
+                                            Click="RefreshSystemConfig_Click"/>
+                                    <Button Content="Save"
+                                            Width="90"
+                                            Height="30"
+                                            Margin="10,0,0,0"
+                                            Click="SaveSystemConfig_Click"/>
+                                    <TextBlock x:Name="SystemConfigStatusText"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="#2E7D32"
+                                               FontSize="13"/>
+                                </StackPanel>
 
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-                        <TextBlock Text="Base URL:"
-                                   Width="140"
-                                   VerticalAlignment="Center"
-                                   Foreground="#333"
-                                   FontSize="14"/>
-                        <TextBox x:Name="LlmBaseUrlBox"
-                                 Width="420"
-                                 Height="30"
-                                 VerticalContentAlignment="Center"
-                                 Text=""/>
-                    </StackPanel>
+                                <DataGrid x:Name="SystemConfigTable"
+                                          Grid.Row="1"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          IsReadOnly="False"
+                                          HeadersVisibility="Column"
+                                          RowHeaderWidth="0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Parameter" Binding="{Binding Key}" Width="220"/>
+                                        <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </TabItem>
 
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
-                        <TextBlock Text="API Key:"
-                                   Width="140"
-                                   VerticalAlignment="Center"
-                                   Foreground="#333"
-                                   FontSize="14"/>
-                        <PasswordBox x:Name="LlmApiKeyBox"
-                                     Width="420"
-                                     Height="30"/>
-                    </StackPanel>
+                        <TabItem Header="LLM Settings">
+                            <Grid Margin="12">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="3" Orientation="Horizontal">
-                        <Button Content="Save"
-                                Width="120"
-                                Height="34"
-                                Margin="0,0,10,0"
-                                Cursor="Hand"
-                                Click="SaveLlmConfig_Click"/>
-                        <TextBlock x:Name="LlmConfigStatusText"
-                                   VerticalAlignment="Center"
-                                   Foreground="#2E7D32"
-                                   FontSize="13"/>
-                    </StackPanel>
+                                <TextBlock Grid.Row="0"
+                                           Text="LLM Configuration"
+                                           FontSize="20"
+                                           FontWeight="SemiBold"
+                                           Foreground="#222"
+                                           Margin="0,0,0,16"/>
+
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <TextBlock Text="Base URL:"
+                                               Width="140"
+                                               VerticalAlignment="Center"
+                                               Foreground="#333"
+                                               FontSize="14"/>
+                                    <TextBox x:Name="LlmBaseUrlBox"
+                                             Width="420"
+                                             Height="30"
+                                             VerticalContentAlignment="Center"
+                                             Text=""/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,16">
+                                    <TextBlock Text="API Key:"
+                                               Width="140"
+                                               VerticalAlignment="Center"
+                                               Foreground="#333"
+                                               FontSize="14"/>
+                                    <PasswordBox x:Name="LlmApiKeyBox"
+                                                 Width="420"
+                                                 Height="30"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="3" Orientation="Horizontal">
+                                    <Button Content="Save"
+                                            Width="120"
+                                            Height="34"
+                                            Margin="0,0,10,0"
+                                            Cursor="Hand"
+                                            Click="SaveLlmConfig_Click"/>
+                                    <TextBlock x:Name="LlmConfigStatusText"
+                                               VerticalAlignment="Center"
+                                               Foreground="#2E7D32"
+                                               FontSize="13"/>
+                                </StackPanel>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
                 </Grid>
 
 

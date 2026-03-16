@@ -24,6 +24,7 @@ using QuestPDF.Infrastructure;
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -57,7 +58,8 @@ namespace ForeSITETestApp
 
         private NotebookWindow? _notebookWindow;
 
-        private ObservableCollection<Model> _models;
+        private ObservableCollection<Model> _models = new();
+        private readonly ObservableCollection<ConfigEntry> _systemConfigEntries = new();
 
         public Dashboard(MainWindow window)
         {
@@ -617,7 +619,7 @@ namespace ForeSITETestApp
 
 
             // Save button click event
-            saveButton.Click += async (s, args) =>
+            saveButton.Click += (s, args) =>
             {
                 try
                 {
@@ -690,7 +692,7 @@ namespace ForeSITETestApp
                     }
 
                     // Check for duplicate names in memory collection
-                    if (_dataSources != null && _dataSources.Any(predicate: ds => ds.Name.Equals(nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    if (_dataSources != null && _dataSources.Any(predicate: ds => string.Equals(ds.Name, nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                     {
                         var result = MessageBox.Show(
                             $"A data source with the name '{nameInput.Text.Trim()}' already exists.\nDo you want to overwrite it?",
@@ -2622,12 +2624,20 @@ namespace ForeSITETestApp
 
             SetupGrid.Visibility = Visibility.Visible;
 
+            LoadSystemConfigIntoUi();
             LoadLlmConfigIntoUi();
         }
 
         // ---------------------------
         // Setup (LLM config)
         // ---------------------------
+        private sealed class ConfigEntry
+        {
+            public string Key { get; set; } = "";
+            public string Value { get; set; } = "";
+            public JTokenType TokenType { get; set; }
+        }
+
         private const string LlmConfigFileName = "llm_config.json";
 
         private sealed class LlmConfig
@@ -2640,6 +2650,137 @@ namespace ForeSITETestApp
         {
             // keep it next to the exe so Task Scheduler / installed app can find it consistently
             return Path.Combine(AppContext.BaseDirectory, LlmConfigFileName);
+        }
+
+        private string GetSystemConfigPath()
+        {
+            return Path.Combine(AppContext.BaseDirectory, "Server", "config.json");
+        }
+
+        private void LoadSystemConfigIntoUi()
+        {
+            try
+            {
+                _systemConfigEntries.Clear();
+                string path = GetSystemConfigPath();
+
+                if (!File.Exists(path))
+                {
+                    _systemConfigEntries.Add(new ConfigEntry
+                    {
+                        Key = "Error",
+                        Value = $"File not found: {path}"
+                    });
+                }
+                else
+                {
+                    var json = JObject.Parse(File.ReadAllText(path));
+                    foreach (var prop in json.Properties())
+                    {
+                        string valueText = prop.Value.Type == JTokenType.Object || prop.Value.Type == JTokenType.Array
+                            ? prop.Value.ToString(Newtonsoft.Json.Formatting.None)
+                            : prop.Value.ToString();
+
+                        _systemConfigEntries.Add(new ConfigEntry
+                        {
+                            Key = prop.Name,
+                            Value = valueText,
+                            TokenType = prop.Value.Type
+                        });
+                    }
+                }
+
+                if (SystemConfigTable != null)
+                    SystemConfigTable.ItemsSource = _systemConfigEntries;
+            }
+            catch (Exception ex)
+            {
+                _systemConfigEntries.Clear();
+                _systemConfigEntries.Add(new ConfigEntry
+                {
+                    Key = "Error",
+                    Value = ex.Message
+                });
+
+                if (SystemConfigTable != null)
+                    SystemConfigTable.ItemsSource = _systemConfigEntries;
+            }
+        }
+
+        private void RefreshSystemConfig_Click(object sender, RoutedEventArgs e)
+        {
+            LoadSystemConfigIntoUi();
+            if (SystemConfigStatusText != null)
+            {
+                SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50));
+                SystemConfigStatusText.Text = "Refreshed";
+            }
+        }
+
+        private static JToken ConvertEntryValue(ConfigEntry entry)
+        {
+            string text = entry.Value ?? string.Empty;
+
+            if (entry.TokenType == JTokenType.Boolean &&
+                bool.TryParse(text, out bool boolValue))
+            {
+                return new JValue(boolValue);
+            }
+
+            if ((entry.TokenType == JTokenType.Integer || entry.TokenType == JTokenType.Float) &&
+                long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long longValue))
+            {
+                return new JValue(longValue);
+            }
+
+            if ((entry.TokenType == JTokenType.Integer || entry.TokenType == JTokenType.Float) &&
+                double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double doubleValue))
+            {
+                return new JValue(doubleValue);
+            }
+
+            if (entry.TokenType == JTokenType.Null)
+            {
+                return string.IsNullOrWhiteSpace(text) ? JValue.CreateNull() : new JValue(text);
+            }
+
+            return new JValue(text);
+        }
+
+        private void SaveSystemConfig_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string path = GetSystemConfigPath();
+                var obj = new JObject();
+
+                foreach (var entry in _systemConfigEntries)
+                {
+                    if (string.IsNullOrWhiteSpace(entry.Key))
+                        continue;
+                    obj[entry.Key] = ConvertEntryValue(entry);
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AppContext.BaseDirectory);
+                File.WriteAllText(path, obj.ToString());
+                LoadSystemConfigIntoUi();
+
+                if (SystemConfigStatusText != null)
+                {
+                    SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50));
+                    SystemConfigStatusText.Text = "Saved to config.json";
+                }
+            }
+            catch (Exception ex)
+            {
+                if (SystemConfigStatusText != null)
+                {
+                    SystemConfigStatusText.Foreground = Brushes.DarkRed;
+                    SystemConfigStatusText.Text = ex.Message;
+                }
+                MessageBox.Show($"Failed to save system config: {ex.Message}", "Setup",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void LoadLlmConfigIntoUi()
