@@ -149,8 +149,8 @@ cd ForeSITE-Alerting-Report
 1. Go to the GitHub release page
 2. Download the following files:
 
-   * **ForeSITEApp.7z** under the most recent release version
-   * **epysurv-dev** under release version 0.6
+   * **ForeSITEApp.7z** under the most recent [release](https://github.com/EpiForeSITE/ForeSITE_Alerting_Report/releases) version
+   * **epysurv-dev** under [release](https://github.com/EpiForeSITE/ForeSITE_Alerting_Report/releases) version 0.6
 
 ---
 
