@@ -142,16 +142,120 @@ cd ForeSITE-Alerting-Report
 
 ## Installation From Release Version 
 
-This release includes the ForeSITE Alerting Report application, featuring integrated Python-based surveillance data processing envrionment and .Net 8 runtime. Key components:
+---
 
-**Python Environment**: Includes the epysurv-env virtual environment with all required dependencies (e.g., rpy2, pandas, Flask) pre-configured for seamless operation.
-**.NET Runtime**: Bundled with the .NET 8 runtime to support the WPF application. If the runtime fails to work on your system, please install the .NET 8 runtime manually from the official .NET website.
+### 🔹 1. Download Required Files
 
-### Setup
-- Download and extract the release archive.
-- Run ForeSITEAlertingReport.exe from the extracted folder.
+1. Go to the GitHub release page
+2. Download the following files:
 
-- Logs and generated files will be saved to C:\Users\<YourUsername>\Documents\ForeSITEAlertingReportFiles.
+   * **ForeSITEApp.7z** under the most recent release version
+   * **epysurv-dev** under release version 0.6
+
+---
+
+### 🔹 2. Extract Files
+
+1. Extract **ForeSITEApp.7z**
+   → You should see a folder named `ForeSITEApp`
+
+2. Open the `ForeSITEApp` folder
+
+3. Locate the **Server** directory
+
+4. Extract **epysurv-dev** into:
+
+```
+ForeSITEApp/Server/
+```
+
+---
+
+### 🔹 3. Launch the Application
+
+1. Navigate to the `ForeSITEApp` folder
+2. Run:
+
+```
+ForeSITETestApp.exe
+```
+
+---
+
+### 🔹 4. Configure Environment
+
+1. When prompted, select:
+
+```
+epysurv-dev
+```
+
+(This should be inside the `Server` folder)
+
+---
+
+### 🔹 5. Create a Report
+
+1. Navigate to the **Reporter** tab
+
+2. Configure your parameters:
+
+   * Select your dataset
+   * Choose detection models (Bayes, CDC, Farrington, etc.)
+   * Adjust thresholds if needed
+
+3. Click **Add Plot**
+
+---
+
+### 🔹 6. Save Report Template
+
+1. Click the **Scheduling** button (bottom of the page)
+2. Save the file as:
+
+```
+report_template.json
+```
+
+---
+
+### 🔹 7. Schedule Automated Reports
+
+1. Navigate to the **Scheduler** tab
+
+2. Configure the following:
+
+   * Path to `report_template.json`
+   * Recipient email
+   * Start date
+   * Frequency (daily, weekly, etc.)
+
+3. Click **Save**
+
+4. Set the scheduler time
+
+5. Click **Start**
+
+---
+
+### 🔹 8. Output
+
+* The system will automatically send email reports
+* Emails are sent based on your configured schedule
+
+---
+
+### ⚠️ Notes / Tips
+
+* Ensure **epysurv-dev is inside the Server folder**, or the app won’t detect it
+* Double-check the file name: `report_template.json`
+* If emails are not received:
+
+  * Verify recipient email
+  * Check scheduler is running
+
+---
+
 
 ## Usage
 
