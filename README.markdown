@@ -359,6 +359,9 @@ ForeSITE-Alerting-Report/
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
 
 ## Animation Demo
+**How to setup our application?**
+![Alerting1](images/ForeSITE_Alerting_Setup.gif)
+
 The application uses **CDC public surveillance data** for demonstration purposes, processed via the `epySurv` module through the Flask server. Users can:
 - Select CDC data as a data source in the "Add Plot" dialog. 
 ![Alerting1](images/Alerting_abnormal_true.gif)
