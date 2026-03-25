@@ -59,38 +59,38 @@ This application integrates with a Python Flask localhost web server to process 
 
 - [Contact](#contact)
 
-## ✨ Features  
+##   Features  
 
-### 📊 Time-Series Data Integration  
+###   Time-Series Data Integration  
 - Import and process surveillance datasets (**CSV, JSON, Web APIs**) 
 - Seamlessly interchange datasets between **R and Python** for flexible analysis.  
 - Prebuilt models (**Farrington, Bayes, Boda, CDC, EARS-C1**, etc.) for anomaly detection in clinical/public health data.  
 
-### 🔔 Alerting & Report Generation  
+###   Alerting & Report Generation  
 - Automated **PDF report generation** with customizable titles and data-driven plots.  
 - Configurable parameters: data source, time range, thresholds, and models.  
 - Monthly scheduled reports with **Windows Task Scheduler** and **automatic email delivery (Gmail)**.  
 
-### 📈 Visualization  
+###  Visualization  
 - Generate rich plots from **CDC public surveillance data** or user-imported datasets.  
 - Flexible configuration for baselines, thresholds, and model comparisons.  
 
-### 🔧 Data Source Management  
+###  Data Source Management  
 - Add, edit, or delete data sources with full API integration.  
 - Supports both internal datasets and external provider APIs.  
 
-### 💻 Interactive Analysis  
+###   Interactive Analysis  
 - **Notebook-like interface** for advanced users, supporting Python and R cells for runtime analysis.  
 - Dynamically add, execute, delete, save, and load analysis cells.  
 
-### 🎨 User-Friendly Customization  
+###  User-Friendly Customization  
 - Rich text editing for report titles (**bold, italic**, etc.).  
 - Robust font fallback (**Arial, Helvetica, Times New Roman**) ensuring PDF compatibility across systems.  
 
 ### ⚙️ Backend Processing  
 - Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
-## ✨ Changelog
+##  Changelog
 
 ### Version 0.9
 - Added Model Management to support user's Python package and R package installation
@@ -122,7 +122,7 @@ This means reports are sent hands-free and on time, according to your preferred 
 - Allowed users to build surveillance models with configurable sliding window parameters, and generate dynamic, customized alert reports.
 
 
-## ✨ Prerequisites
+##   Prerequisites
 
 - **Operating System**: Windows 10 or later
 - **.NET Framework**: .NET 8.0 or higher
