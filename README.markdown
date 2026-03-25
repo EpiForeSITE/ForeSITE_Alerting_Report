@@ -7,7 +7,7 @@
 
 This application integrates with a Python Flask localhost web server to process data using the `epySurv` module, leveraging CDC public surveillance data for demonstration and allowing users to import custom datasets for analysis. The application supports creating PDF reports with visualizations, managing data sources, scheduling automated report generation, and emailing reports via Gmail/Outlook. Built with C#, XAML, QuestPDF, epySurv, matplotlib, rpy2 and a Flask backend, it provides a user-friendly interface for analysts and data professionals to create and share insightful reports.
 
-- [ForeSITE Alerting Report Table of Contents](#foresite-alerting-report)
+- [ForeSITE Alerting Report](#foresite-alerting-report)
   * [✨ Features](#--features)
     + [📊 Time-Series Data Integration](#---time-series-data-integration)
     + [🔔 Alerting & Report Generation](#---alerting---report-generation)
@@ -57,6 +57,9 @@ This application integrates with a Python Flask localhost web server to process 
   * [Contributing](#contributing)
   * [License](#license)
   * [Contact](#contact)
+
+<small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
 ## ✨ Features  
 
 ### 📊 Time-Series Data Integration  
