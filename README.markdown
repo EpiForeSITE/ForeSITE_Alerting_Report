@@ -87,7 +87,7 @@ This application integrates with a Python Flask localhost web server to process 
 - Rich text editing for report titles (**bold, italic**, etc.).  
 - Robust font fallback (**Arial, Helvetica, Times New Roman**) ensuring PDF compatibility across systems.  
 
-### ⚙️ Backend Processing  
+###   Backend Processing  
 - Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
 ##  Changelog
