@@ -202,7 +202,7 @@ cd ForeSITE-Alerting-Report
 2. Download the following files:
 
    * **ForeSITEApp.7z** under the most recent [release](https://github.com/EpiForeSITE/ForeSITE_Alerting_Report/releases) version
-   * **epysurv-dev** under [release](https://github.com/EpiForeSITE/ForeSITE_Alerting_Report/releases) version 0.6
+   * **mynewenv.7z** under [release](https://github.com/EpiForeSITE/ForeSITE_Alerting_Report/releases) version 1.0
 
 ---
 
@@ -215,7 +215,7 @@ cd ForeSITE-Alerting-Report
 
 3. Locate the **Server** directory
 
-4. Extract **epysurv-dev** into:
+4. Extract **mynewenv** into:
 
 ```
 ForeSITEApp/Server/
@@ -239,7 +239,7 @@ ForeSITETestApp.exe
 1. When prompted, select:
 
 ```
-epysurv-dev
+mynewenv
 ```
 
 (This should be inside the `Server` folder)
@@ -299,7 +299,7 @@ report_template.json
 
 ### ⚠️ Notes / Tips
 
-* Ensure **epysurv-dev is inside the Server folder**, or the app won’t detect it
+* Ensure **mynewenv is inside the Server folder**, or the app won’t detect it
 * Double-check the file name: `report_template.json`
 * If emails are not received:
 
