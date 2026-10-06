@@ -803,7 +803,7 @@ namespace ForeSITETestApp
                             "1. Open terminal/command prompt\n" +
                             "2. Navigate to your Python script directory\n" +
                             "3. Run: python epyflaServer.py\n" +
-                            "4. Wait for 'Running on http://127.0.0.1:5001' message\n\n" +
+                            "4. Wait for the local ForeSITE server ready message\n\n" +
                             "Then try executing the cell again.",
                             OutputType.Error);
                         return;
@@ -906,9 +906,8 @@ namespace ForeSITETestApp
                 if (httpEx.Message.Contains("refused") || httpEx.Message.Contains("timeout"))
                 {
                     errorMessage += "Connection Issue:\n" +
-                                   "• Make sure Python/R server is running on port 5001\n" +
-                                   "• Check if port 5001 is blocked by firewall\n" +
-                                   "• Verify server address: http://127.0.0.1:5001";
+                                   "• Make sure the ForeSITE-managed Python/R server is running\n" +
+                                   "• Check the application log for its local port and startup error";
                 }
                 else
                 {
@@ -1165,9 +1164,8 @@ namespace ForeSITETestApp
                 else if (httpEx.Message.Contains("refused") || httpEx.Message.Contains("timeout"))
                 {
                     errorMessage += "Connection Issue:\n" +
-                                   "• Make sure Python server is running on port 5001\n" +
-                                   "• Check if port 5001 is blocked by firewall\n" +
-                                   "• Verify server address: http://127.0.0.1:5001";
+                                   "• Make sure the ForeSITE-managed Python server is running\n" +
+                                   "• Check the application log for its local port and startup error";
                 }
                 else
                 {
@@ -1404,7 +1402,7 @@ namespace ForeSITETestApp
                     "Surv Server is not running or not accessible.\n\n" +
                     "Please make sure the enhanced server is started:\n" +
                     "python epyflaServer.py\n\n" +
-                    "Server should be running on http://127.0.0.1:5001",
+                    "The ForeSITE-managed local server should be running",
                     "Server Connection Warning",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

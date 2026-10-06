@@ -28,11 +28,11 @@ namespace ForeSITEScheduler
 
     public class ModelProperty : INotifyPropertyChanged
     {
-        private string _name;
-        private string _type;
-        private string _defaultValue;
+        private string _name = string.Empty;
+        private string _type = string.Empty;
+        private string _defaultValue = string.Empty;
         private bool _displayInUI;
-        private string _title;
+        private string _title = string.Empty;
 
         public string Name
         {
@@ -99,7 +99,7 @@ namespace ForeSITEScheduler
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string name)
         {
@@ -109,14 +109,14 @@ namespace ForeSITEScheduler
 
     public class Model : INotifyPropertyChanged
     {
-        private string _name;
-        private string _fullname;
-        private string _type;
-        private string _description;
+        private string _name = string.Empty;
+        private string _fullname = string.Empty;
+        private string _type = string.Empty;
+        private string _description = string.Empty;
         private bool _enabled;
-        private ObservableCollection<ModelProperty> _properties;
-        private string _createdDate;
-        private string _lastUpdated;
+        private ObservableCollection<ModelProperty> _properties = new();
+        private string _createdDate = string.Empty;
+        private string _lastUpdated = string.Empty;
 
         public string Name
         {
@@ -235,7 +235,7 @@ namespace ForeSITEScheduler
             Properties = new ObservableCollection<ModelProperty>();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string name)
         {
@@ -281,10 +281,13 @@ namespace ForeSITEScheduler
     public class SchedulerTask
     {
         public int Id { get; set; }
+        public int? ReportId { get; set; }
         public string? Recipients { get; set; }
         public string? AttachmentPath { get; set; }
         public string? StartDate { get; set; }   // YYYY-MM-DD
         public string? Freq { get; set; }
+        public string DeliveryMethod { get; set; } = "Email";
+        public bool IsEnabled { get; set; } = true;
         public bool IsSelected { get; set; }
     }
 

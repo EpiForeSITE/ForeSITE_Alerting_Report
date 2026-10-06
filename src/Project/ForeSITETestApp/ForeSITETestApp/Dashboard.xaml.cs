@@ -32,6 +32,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -61,6 +62,8 @@ namespace ForeSITETestApp
 
         private ObservableCollection<Model> _models = new();
         private readonly ObservableCollection<ConfigEntry> _systemConfigEntries = new();
+        private ObservableCollection<ReportRecord> _allReports = new();
+        private ReportRecord? _selectedReport;
 
         public Dashboard(MainWindow window)
         {
@@ -79,13 +82,15 @@ namespace ForeSITETestApp
 
             ObservableCollection<SchedulerTask> schedulers = DBHelper.GetAllSchedulers();
             SchedulerTable.ItemsSource = schedulers;
+            UpdateSchedulerSelectionState();
+            RefreshReportLibrary();
 
 
             // Initialize default FlowDocument
             _titleDocument = new FlowDocument(new Paragraph(new Run("Click to edit title")));
             // Set custom font resolver
             //GlobalFontSettings.FontResolver = new CustomFontResolver();
-            DrawingCanvas.Height = 300; // Minimum height for placeholder
+            DrawingCanvas.Height = 668; // Report-page working area inside the live canvas
             CheckAndManagePlaceholder();
 
             DataContext = this;
@@ -97,9 +102,57 @@ namespace ForeSITETestApp
         {
             bool exists = TaskExists(TaskName);
 
-            // if task exists，disable Start，start End
-            BtnStart.IsEnabled = !exists;
+            BtnStart.IsEnabled = true;
+            BtnStart.Content = exists ? "UPDATE SERVICE" : "START SERVICE";
             BtnEnd.IsEnabled = exists;
+            TimeSpan? configuredTime = exists ? GetConfiguredTaskTime() : null;
+            if (configuredTime.HasValue)
+            {
+                HourSelector.SelectedItem = configuredTime.Value.Hours.ToString("00");
+                MinuteSelector.SelectedItem = configuredTime.Value.Minutes.ToString("00");
+            }
+            SchedulerServiceStatusText.Text = exists
+                ? configuredTime.HasValue ? $"Active · daily at {configuredTime.Value:hh\\:mm}" : "Active"
+                : "Not configured";
+            SchedulerServiceStatusDot.Fill = new SolidColorBrush(exists
+                ? System.Windows.Media.Color.FromRgb(46, 125, 50)
+                : System.Windows.Media.Color.FromRgb(158, 171, 180));
+        }
+
+        private TimeSpan? GetConfiguredTaskTime()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo("schtasks", $"/query /tn {TaskName} /xml")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var process = Process.Start(psi);
+                if (process == null)
+                    return null;
+
+                string xml = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(xml))
+                    return null;
+
+                string? startBoundary = XDocument.Parse(xml)
+                    .Descendants()
+                    .FirstOrDefault(element => element.Name.LocalName == "StartBoundary")
+                    ?.Value;
+
+                return DateTimeOffset.TryParse(startBoundary, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AllowWhiteSpaces, out var scheduledAt)
+                    ? scheduledAt.TimeOfDay
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         // INotifyPropertyChanged implementation
@@ -120,31 +173,13 @@ namespace ForeSITETestApp
             // MinuteSelector.SelectedItem = next.Minute.ToString("00");
         }
 
-        public int DataSourceCount
-        {
-            get { return _dataSources?.Count ?? 0; }
-        }
-
         private void InitializeDataSources()
         {
             // Load data sources from the database
             _dataSources = DBHelper.GetAllDataSources();
 
-            // Subscribe to collection changed events
-            if (_dataSources != null)
-            {
-                _dataSources.CollectionChanged += (sender, e) =>
-                {
-                    // Manually update the TextBlock when collection changes
-                    UpdateDataSourceCountDisplay();
-                };
-            }
-
             DataSourceTable.ItemsSource = _dataSources;
             DataSourceSelector.ItemsSource = _dataSources; // Bind to DataSourceSelector
-
-            // Initialize the display
-            UpdateDataSourceCountDisplay();
         }
 
         private void InitializeModels()
@@ -170,83 +205,408 @@ namespace ForeSITETestApp
     
         private void SchedulerButton_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNavigation(SchedulerButton);
             HeaderTitle.Text = "Schedule Management";
-            DefaultContentGrid.Visibility = Visibility.Collapsed;
             SchedulerGrid.Visibility = Visibility.Visible;
             ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
             SetupGrid.Visibility = Visibility.Collapsed;
-        }
-
-        // Helper method to refresh just the data source count
-        private void RefreshDataSourceCount()
-        {
-            try
-            {
-                // Get updated count from database
-                var latestDataSources = DBHelper.GetAllDataSources();
-
-                // Update the collection if the count has changed
-                if (_dataSources != null && _dataSources.Count != latestDataSources.Count)
-                {
-                    RefreshDataSourcesList();
-                }
-
-                // Manually update the TextBlock display
-                UpdateDataSourceCountDisplay();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error refreshing data source count: {ex.Message}");
-            }
-        }
-
-        private void HomeButton_Click(object sender, RoutedEventArgs e)
-        {
-            HeaderTitle.Text = "Home";
-            DefaultContentGrid.Visibility = Visibility.Visible;
-            SchedulerGrid.Visibility = Visibility.Collapsed;
-            ReportsGrid.Visibility = Visibility.Collapsed;
-            DataSourceGrid.Visibility = Visibility.Collapsed;
-            ModelGrid.Visibility = Visibility.Collapsed;
-            RefreshDataSourceCount();
-            SetupGrid.Visibility = Visibility.Collapsed;
-        }
-
-        private void UpdateDataSourceCountDisplay()
-        {
-            try
-            {
-                // Update the TextBlock directly
-                if (DataSourceCountTextBlock != null)
-                {
-                    DataSourceCountTextBlock.Text = (_dataSources?.Count ?? 0).ToString();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error updating data source count display: {ex.Message}");
-            }
         }
 
         private void ReportButton_Click(object sender, RoutedEventArgs e)
         {
-            HeaderTitle.Text = "Report Builder";
-            DefaultContentGrid.Visibility = Visibility.Collapsed;
+            SetActiveNavigation(ReportButton);
+            HeaderTitle.Text = "Report Library";
             SchedulerGrid.Visibility = Visibility.Collapsed;
-            ReportsGrid.Visibility = Visibility.Visible;
+            ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Visible;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
             SetupGrid.Visibility = Visibility.Collapsed;
+            RefreshReportLibrary();
+        }
+
+        private void LibraryModeButton_Click(object sender, RoutedEventArgs e) => ShowReportLibrary();
+
+        private void BuilderModeButton_Click(object sender, RoutedEventArgs e) => ShowReportBuilder();
+
+        private void NewReportButton_Click(object sender, RoutedEventArgs e) => ShowReportBuilder();
+
+        private void ShowReportLibrary(int? selectReportId = null)
+        {
+            HeaderTitle.Text = "Report Library";
+            ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Visible;
+            LibraryModeButton.Foreground = (Brush)new BrushConverter().ConvertFrom("#F2A900")!;
+            LibraryModeButton.Background = (Brush)new BrushConverter().ConvertFrom("#27333B")!;
+            LibraryModeButton.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#F2A900")!;
+            BuilderModeButton.Foreground = (Brush)new BrushConverter().ConvertFrom("#CFD7DD")!;
+            BuilderModeButton.Background = Brushes.Transparent;
+            BuilderModeButton.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#596873")!;
+            RefreshReportLibrary(selectReportId);
+        }
+
+        private void ShowReportBuilder()
+        {
+            HeaderTitle.Text = "Report Builder";
+            ReportLibraryGrid.Visibility = Visibility.Collapsed;
+            ReportsGrid.Visibility = Visibility.Visible;
+            BuilderModeButton.Foreground = (Brush)new BrushConverter().ConvertFrom("#F2A900")!;
+            BuilderModeButton.Background = (Brush)new BrushConverter().ConvertFrom("#27333B")!;
+            BuilderModeButton.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#F2A900")!;
+            LibraryModeButton.Foreground = (Brush)new BrushConverter().ConvertFrom("#CFD7DD")!;
+            LibraryModeButton.Background = Brushes.Transparent;
+            LibraryModeButton.BorderBrush = (Brush)new BrushConverter().ConvertFrom("#596873")!;
+        }
+
+        private void RefreshReportLibrary(int? selectReportId = null)
+        {
+            try
+            {
+                int? desiredId = selectReportId ?? _selectedReport?.Id;
+                _allReports = DBHelper.GetAllReports();
+                ApplyReportFilter(desiredId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to load saved reports.\n\n{ex.Message}", "Report Library",
+                                MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ApplyReportFilter(int? selectReportId = null)
+        {
+            string search = ReportSearchBox?.Text?.Trim() ?? "";
+            var filtered = _allReports
+                .Where(r => string.IsNullOrEmpty(search) || r.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            ReportLibraryList.ItemsSource = filtered;
+            ReportLibraryList.SelectedItem = selectReportId.HasValue
+                ? filtered.FirstOrDefault(r => r.Id == selectReportId.Value)
+                : filtered.FirstOrDefault();
+            if (filtered.Count == 0)
+                ClearReportView(search.Length == 0 ? "No saved reports" : "No reports match your search");
+        }
+
+        private void ReportSearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyReportFilter(_selectedReport?.Id);
+
+        private void ReportLibraryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _selectedReport = ReportLibraryList.SelectedItem as ReportRecord;
+            if (_selectedReport == null)
+            {
+                ClearReportView("Choose a saved report");
+                return;
+            }
+
+            ReportViewTitle.Text = _selectedReport.Name.ToUpperInvariant();
+            ReportDetailsName.Text = _selectedReport.Name;
+            ReportDetailsSchedule.Text = _selectedReport.SchedulerId.HasValue
+                ? $"{_selectedReport.Frequency} · {(_selectedReport.ScheduleEnabled ? "Active" : "Paused")}" : "Not scheduled";
+            ReportDetailsDelivery.Text = _selectedReport.DeliveryMethod;
+            ReportDetailsGenerated.Text = _selectedReport.LastGeneratedAt?.ToString("g") ?? "Never";
+            LoadDefinitionProvenance(_selectedReport);
+            RunSavedReportButton.IsEnabled = true;
+            EditSavedReportButton.IsEnabled = true;
+
+            var runs = DBHelper.GetReportRuns(_selectedReport.Id);
+            ReportRunHistoryList.ItemsSource = runs;
+            ReportRunHistoryEmpty.Visibility = runs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var latestCompleted = runs.FirstOrDefault(r => r.CompletedAt.HasValue && !string.Equals(r.Status, "Failed", StringComparison.OrdinalIgnoreCase));
+            ReportRunHistoryList.SelectedItem = latestCompleted ?? runs.FirstOrDefault();
+            if (runs.Count == 0)
+            {
+                ReportViewStatus.Text = "READY TO RUN";
+                ReportDetailsDataAsOf.Text = "Not available";
+                OpenLatestPdfButton.IsEnabled = false;
+                RenderReportDocument(_selectedReport.DefinitionJson, isSnapshot: false);
+            }
+        }
+
+        private void ReportRunHistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ReportRunHistoryList.SelectedItem is not ReportRunRecord run)
+                return;
+
+            ReportViewStatus.Text = run.Status.ToUpperInvariant();
+            ReportDetailsGenerated.Text = run.CompletedAt?.ToString("g") ?? "In progress";
+            ReportDetailsDataAsOf.Text = run.DataAsOf ?? "Not available";
+            OpenLatestPdfButton.IsEnabled = !string.IsNullOrWhiteSpace(run.PdfPath) && File.Exists(run.PdfPath);
+            if (string.Equals(run.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+            {
+                ClearReportContent("Report run failed", run.ErrorMessage ?? "No error details were recorded.");
+                return;
+            }
+            RenderReportDocument(run.SnapshotJson, isSnapshot: true);
+        }
+
+        private async void RunSavedReportButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedReport == null) return;
+            ReportRecord report = _selectedReport;
+            DateTime startedAt = DateTime.Now;
+            RunSavedReportButton.IsEnabled = false;
+            RunSavedReportButton.Content = "RUNNING…";
+            ReportViewStatus.Text = "RUNNING";
+
+            try
+            {
+                JObject definition = JObject.Parse(report.DefinitionJson);
+                var snapshotLayout = new JArray();
+                bool isAbnormal = false;
+                foreach (JObject item in definition["layout"]?.OfType<JObject>() ?? Enumerable.Empty<JObject>())
+                {
+                    string type = item.Value<string>("type") ?? "";
+                    if (!type.Equals("Plot", StringComparison.OrdinalIgnoreCase))
+                    {
+                        snapshotLayout.Add(item.DeepClone());
+                        continue;
+                    }
+
+                    JObject graph = (item["params"] as JObject)?.DeepClone() as JObject ?? new JObject();
+                    graph["designFlag"] = true;
+                    graph["abnormalReportFlag"] = false;
+                    using var content = new StringContent(new JObject { ["graph"] = graph }.ToString(), Encoding.UTF8, "application/json");
+                    using HttpResponseMessage response = await _httpClient.PostAsync("/epyapi", content);
+                    string body = await response.Content.ReadAsStringAsync();
+                    if (!response.IsSuccessStatusCode)
+                        throw new InvalidOperationException($"Plot generation failed ({(int)response.StatusCode}). {TryGetApiError(body)}");
+
+                    JObject result = JObject.Parse(body);
+                    string imagePath = result.Value<string>("plot_path") ?? "";
+                    if (!File.Exists(imagePath)) throw new FileNotFoundException("The plot service did not create the expected image.", imagePath);
+                    bool plotAbnormal = result.Value<bool?>("abnormal") ?? false;
+                    isAbnormal |= plotAbnormal;
+                    snapshotLayout.Add(new JObject
+                    {
+                        ["type"] = "Plot", ["params"] = graph,
+                        ["imagePath"] = imagePath, ["abnormal"] = plotAbnormal
+                    });
+                }
+
+                DateTime completedAt = DateTime.Now;
+                JObject snapshot = new()
+                {
+                    ["generatedAt"] = completedAt.ToString("O"),
+                    ["dataAsOf"] = DateTime.Today.ToString("yyyy-MM-dd"),
+                    ["abnormal"] = isAbnormal,
+                    ["layout"] = snapshotLayout
+                };
+                string outputDirectory = Path.Combine(AppPaths.ReportsDirectory, report.Id.ToString(CultureInfo.InvariantCulture), "Runs");
+                Directory.CreateDirectory(outputDirectory);
+                string pdfPath = Path.Combine(outputDirectory, $"Report_{completedAt:yyyyMMdd_HHmmss}.pdf");
+                GenerateSnapshotPdf(snapshot, pdfPath, report.Name);
+                DBHelper.InsertReportRun(new ReportRunRecord
+                {
+                    ReportId = report.Id, SchedulerId = null, StartedAt = startedAt,
+                    CompletedAt = completedAt, DataAsOf = DateTime.Today.ToString("yyyy-MM-dd"),
+                    Status = isAbnormal ? "Abnormal" : "Normal", IsAbnormal = isAbnormal,
+                    PdfPath = pdfPath, SnapshotJson = snapshot.ToString(Newtonsoft.Json.Formatting.None)
+                });
+                RefreshReportLibrary(report.Id);
+            }
+            catch (Exception ex)
+            {
+                DBHelper.InsertReportRun(new ReportRunRecord
+                {
+                    ReportId = report.Id, SchedulerId = null, StartedAt = startedAt,
+                    CompletedAt = DateTime.Now, Status = "Failed", ErrorMessage = ex.Message
+                });
+                RefreshReportLibrary(report.Id);
+                MessageBox.Show(ex.Message, "Report Run Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                RunSavedReportButton.Content = "RUN NOW";
+                RunSavedReportButton.IsEnabled = _selectedReport != null;
+            }
+        }
+
+        private void OpenLatestPdfButton_Click(object sender, RoutedEventArgs e)
+        {
+            string? path = (ReportRunHistoryList.SelectedItem as ReportRunRecord)?.PdfPath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                MessageBox.Show("The PDF for this run is not available.", "Open PDF", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+
+        private void EditSavedReportButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedReport == null) return;
+            try
+            {
+                JObject definition = JObject.Parse(_selectedReport.DefinitionJson);
+                JObject? graph = definition["layout"]?.OfType<JObject>()
+                    .FirstOrDefault(i => string.Equals(i.Value<string>("type"), "Plot", StringComparison.OrdinalIgnoreCase))?["params"] as JObject;
+                if (graph != null)
+                {
+                    DataSourceSelector.SelectedItem = _dataSources?.FirstOrDefault(d => string.Equals(d.Name, graph.Value<string>("dataSource"), StringComparison.OrdinalIgnoreCase));
+                    ModelSelector.SelectedItem = _models.FirstOrDefault(m => string.Equals(m.Name, graph.Value<string>("model"), StringComparison.OrdinalIgnoreCase));
+                    if (DateTime.TryParse(graph.Value<string>("beginDate"), out var beginDate)) BeginDatePicker.SelectedDate = beginDate;
+                    SelectComboItem(FreqSelector, graph.Value<string>("freq"));
+                    ThresholdInput.Text = graph.Value<string>("threshold") ?? ThresholdInput.Text;
+                    TrainSplitCheckBox.IsChecked = graph.Value<bool?>("useTrainSplit") ?? false;
+                    TrainSplitRatioInput.Text = graph.Value<string>("trainSplitRatio") ?? TrainSplitRatioInput.Text;
+                    if (DateTime.TryParse(graph.Value<string>("trainEndDate"), out var trainEnd)) TrainEndDatePicker.SelectedDate = trainEnd;
+                    TxtBaseline.Text = graph.Value<string>("baseline") ?? TxtBaseline.Text;
+                    TxtMcMunu.Text = graph.Value<string>("mc_munu") ?? TxtMcMunu.Text;
+                    SelectComboItem(YearBackSelector, graph.Value<string>("yearBack"));
+                }
+                ShowReportBuilder();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to load this report definition.\n\n{ex.Message}", "Edit Report", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static void SelectComboItem(ComboBox combo, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            combo.SelectedItem = combo.Items.OfType<object>().FirstOrDefault(item =>
+                string.Equals((item as ComboBoxItem)?.Content?.ToString() ?? item.ToString(), value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void LoadDefinitionProvenance(ReportRecord report)
+        {
+            try
+            {
+                JObject definition = JObject.Parse(report.DefinitionJson);
+                JObject? graph = definition["layout"]?.OfType<JObject>()
+                    .FirstOrDefault(i => string.Equals(i.Value<string>("type"), "Plot", StringComparison.OrdinalIgnoreCase))?["params"] as JObject;
+                ReportDetailsDataSource.Text = graph?.Value<string>("dataSource") ?? "Not available";
+                ReportDetailsAlgorithm.Text = graph?.Value<string>("model") ?? "Not available";
+                string begin = graph?.Value<string>("beginDate") ?? "Start not set";
+                string frequency = graph?.Value<string>("freq") ?? report.Frequency;
+                ReportDetailsPeriod.Text = $"From {begin} · {frequency}";
+                ReportDetailsThreshold.Text = graph?.Value<string>("threshold") ?? "Not available";
+                ReportDetailsDefinition.Text = $"v1 · {report.UpdatedAt:g}";
+            }
+            catch
+            {
+                ReportDetailsDataSource.Text = ReportDetailsAlgorithm.Text = ReportDetailsPeriod.Text =
+                    ReportDetailsThreshold.Text = "Not available";
+                ReportDetailsDefinition.Text = report.UpdatedAt == DateTime.MinValue ? "Not available" : $"v1 · {report.UpdatedAt:g}";
+            }
+        }
+
+        private void ClearReportView(string heading)
+        {
+            _selectedReport = null;
+            ReportViewTitle.Text = "REPORT VIEW";
+            ReportViewStatus.Text = "SELECT A REPORT";
+            ReportDetailsName.Text = "No report selected";
+            ReportDetailsDataSource.Text = "Not available";
+            ReportDetailsAlgorithm.Text = "Not available";
+            ReportDetailsPeriod.Text = "Not available";
+            ReportDetailsThreshold.Text = "Not available";
+            ReportDetailsDefinition.Text = "Not available";
+            ReportDetailsSchedule.Text = "Not scheduled";
+            ReportDetailsDelivery.Text = "None";
+            ReportDetailsGenerated.Text = "Never";
+            ReportDetailsDataAsOf.Text = "Not available";
+            ReportRunHistoryList.ItemsSource = null;
+            ReportRunHistoryEmpty.Visibility = Visibility.Visible;
+            RunSavedReportButton.IsEnabled = OpenLatestPdfButton.IsEnabled = EditSavedReportButton.IsEnabled = false;
+            ClearReportContent(heading, "Create a report in Report Builder or choose one from the library.");
+        }
+
+        private void ClearReportContent(string heading, string detail)
+        {
+            ReportViewContent.Children.Clear();
+            ReportViewContent.Children.Add(new TextBlock { Text = heading, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(73, 87, 96)), FontSize = 22, FontWeight = FontWeights.SemiBold, Margin = new Thickness(8, 50, 8, 10) });
+            ReportViewContent.Children.Add(new TextBlock { Text = detail, Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(103, 119, 129)), FontSize = 14, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 8, 0) });
+        }
+
+        private void RenderReportDocument(string json, bool isSnapshot)
+        {
+            ReportViewContent.Children.Clear();
+            JObject document = JObject.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json);
+            var layout = document["layout"]?.OfType<JObject>().ToList() ?? new List<JObject>();
+            if (layout.Count == 0)
+            {
+                ClearReportContent("This report has no content", "Open it in Report Builder to add a title, narrative, or chart.");
+                return;
+            }
+            foreach (JObject item in layout)
+            {
+                string type = item.Value<string>("type") ?? "";
+                if (type.Equals("Title", StringComparison.OrdinalIgnoreCase))
+                    ReportViewContent.Children.Add(new TextBlock { Text = item["content"]?.Value<string>("text") ?? "", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 42, 49)), FontSize = 26, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 22) });
+                else if (type.Equals("Comment", StringComparison.OrdinalIgnoreCase))
+                    ReportViewContent.Children.Add(new TextBlock { Text = item["content"]?.Value<string>("text") ?? "", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(45, 58, 66)), FontSize = 14, TextWrapping = TextWrapping.Wrap, LineHeight = 22, Margin = new Thickness(0, 0, 0, 20) });
+                else if (type.Equals("Plot", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? imagePath = item.Value<string>("imagePath") ?? item.Value<string>("plot_path");
+                    if (isSnapshot && !string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
+                    {
+                        var bitmap = new BitmapImage();
+                        bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.UriSource = new Uri(imagePath, UriKind.Absolute); bitmap.EndInit(); bitmap.Freeze();
+                        ReportViewContent.Children.Add(new System.Windows.Controls.Image { Source = bitmap, MaxWidth = 680, Height = 390, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 22) });
+                    }
+                    else
+                    {
+                        JObject? parameters = item["params"] as JObject;
+                        var panel = new StackPanel();
+                        panel.Children.Add(new TextBlock { Text = parameters?.Value<string>("title") ?? "Surveillance visualization", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(30, 42, 49)), FontSize = 17, FontWeight = FontWeights.SemiBold });
+                        panel.Children.Add(new TextBlock { Text = $"{parameters?.Value<string>("dataSource") ?? "Data source"} · {parameters?.Value<string>("model") ?? "Model"}", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(89, 105, 115)), FontSize = 13, Margin = new Thickness(0, 5, 0, 0) });
+                        panel.Children.Add(new TextBlock { Text = "Visualization will be generated when you run this report.", Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(103, 119, 129)), FontSize = 13, Margin = new Thickness(0, 22, 0, 0) });
+                        ReportViewContent.Children.Add(new Border { BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(185, 193, 198)), BorderThickness = new Thickness(1), Padding = new Thickness(22), MinHeight = 150, Child = panel, Margin = new Thickness(0, 0, 0, 22) });
+                    }
+                }
+            }
+        }
+
+        private static string TryGetApiError(string responseBody)
+        {
+            try
+            {
+                JObject json = JObject.Parse(responseBody);
+                return json.Value<string>("detail") ?? json.Value<string>("error") ?? json.Value<string>("message") ?? responseBody;
+            }
+            catch { return responseBody.Length > 500 ? responseBody[..500] : responseBody; }
+        }
+
+        private static void GenerateSnapshotPdf(JObject snapshot, string outputPath, string reportName)
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+            var layout = snapshot["layout"]?.OfType<JObject>().ToList() ?? new List<JObject>();
+            Document.Create(container => container.Page(page =>
+            {
+                page.Size(PageSizes.A4); page.Margin(36); page.DefaultTextStyle(x => x.FontSize(11));
+                page.Header().Text(reportName).FontSize(9).FontColor(QuestPDF.Helpers.Colors.Grey.Medium);
+                page.Content().Column(column =>
+                {
+                    foreach (JObject item in layout)
+                    {
+                        string type = item.Value<string>("type") ?? "";
+                        if (type.Equals("Title", StringComparison.OrdinalIgnoreCase))
+                            column.Item().PaddingBottom(14).AlignCenter().Text(item["content"]?.Value<string>("text") ?? "").FontSize(22).Bold();
+                        else if (type.Equals("Comment", StringComparison.OrdinalIgnoreCase))
+                            column.Item().PaddingBottom(12).Text(item["content"]?.Value<string>("text") ?? "");
+                        else if (type.Equals("Plot", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string? path = item.Value<string>("imagePath") ?? item.Value<string>("plot_path");
+                            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) column.Item().PaddingBottom(18).Image(File.ReadAllBytes(path)).FitWidth();
+                        }
+                    }
+                });
+                page.Footer().AlignCenter().Text(text => { text.Span("Page "); text.CurrentPageNumber(); text.Span(" / "); text.TotalPages(); });
+            })).GeneratePdf(outputPath);
         }
 
         private void DataSourceButton_Click(object sender, RoutedEventArgs e)
         {
+            SetActiveNavigation(DataSourceButton);
             HeaderTitle.Text = "Data Source Management";
-            DefaultContentGrid.Visibility = Visibility.Collapsed;
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Visible;
             ModelGrid.Visibility = Visibility.Collapsed;
             SetupGrid.Visibility = Visibility.Collapsed;
@@ -254,10 +614,11 @@ namespace ForeSITETestApp
 
         private void ModelButton_Click(object sender, RoutedEventArgs e)
         {
-            HeaderTitle.Text = "Model Management";
-            DefaultContentGrid.Visibility = Visibility.Collapsed;
+            SetActiveNavigation(ModelButton);
+            HeaderTitle.Text = "Algorithms";
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Visible;
             SetupGrid.Visibility = Visibility.Collapsed;
@@ -272,7 +633,7 @@ namespace ForeSITETestApp
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 // Send POST request to 127.0.0.1
-                HttpResponseMessage response = await _httpClient.PostAsync("http://127.0.0.1:5001/epyapi", content);
+                HttpResponseMessage response = await _httpClient.PostAsync("/epyapi", content);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -297,19 +658,15 @@ namespace ForeSITETestApp
                 {
                     _placeholderTextBlock = new TextBlock
                     {
-                        Text = "Drawing Area Placeholder",
-                        Foreground = Brushes.Gray,
-                        FontSize = 14,
-                        TextAlignment = TextAlignment.Center,
-                        VerticalAlignment = System.Windows.VerticalAlignment.Center
+                        Text = "Build your report\n\nAdd a title, narrative, or chart from the inspector.\nRun Report to generate the current surveillance visualization.",
+                        Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(91, 105, 115)),
+                        FontSize = 15,
+                        LineHeight = 24,
+                        TextAlignment = TextAlignment.Left,
+                        MaxWidth = 430
                     };
-                    // Center the placeholder (adjust based on canvas size)
-                    Canvas.SetLeft(_placeholderTextBlock, (DrawingCanvas.ActualWidth - _placeholderTextBlock.ActualWidth) / 2);
-                    Canvas.SetTop(_placeholderTextBlock, (DrawingCanvas.ActualHeight - _placeholderTextBlock.ActualHeight) / 2);
-                    if (DrawingCanvas.ActualWidth == 0 || DrawingCanvas.ActualHeight == 0)
-                    {
-                        DrawingCanvas.SizeChanged += (s, e) => CheckAndManagePlaceholder();
-                    }
+                    Canvas.SetLeft(_placeholderTextBlock, 42);
+                    Canvas.SetTop(_placeholderTextBlock, 42);
                     DrawingCanvas.Children.Add(_placeholderTextBlock);
                 }
             }
@@ -366,9 +723,6 @@ namespace ForeSITETestApp
                         });
                     }
                 }
-                // Manually update the TextBlock
-                UpdateDataSourceCountDisplay();
-
                 // Refresh the data source toolbar if it exists
                 if (_notebookWindow != null)
                 {
@@ -384,372 +738,153 @@ namespace ForeSITETestApp
 
         private void AddDataSourceButton_Click(object sender, RoutedEventArgs e)
         {
+            // The form is a permanent tab. Repeated clicks simply return to the same instance.
+            DataSourceTabs.SelectedItem = NewDataSourceTab;
+            DataSourceNameInput.Focus();
+        }
 
-            var mainStackPanel = new StackPanel
+        private void DataSourceType_Checked(object sender, RoutedEventArgs e)
+        {
+            if (RealtimeFieldsPanel == null || StaticFieldsPanel == null || DataSourceFormStatus == null)
+                return;
+
+            bool isRealtime = RealtimeRadio.IsChecked == true;
+            RealtimeFieldsPanel.Visibility = isRealtime ? Visibility.Visible : Visibility.Collapsed;
+            StaticFieldsPanel.Visibility = isRealtime ? Visibility.Collapsed : Visibility.Visible;
+            DataSourceFormStatus.Text = isRealtime
+                ? "All fields are required for API sources."
+                : "Choose one CSV file that will remain available at this location.";
+        }
+
+        private void BrowseDataSourceFile_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new Microsoft.Win32.OpenFileDialog
             {
-                Margin = new Thickness(20),
-                Children = { }
+                Title = "Select CSV Data File",
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                FilterIndex = 1,
+                RestoreDirectory = true
             };
 
-            // Data Source Name
-            mainStackPanel.Children.Add(new TextBlock
+            if (openFileDialog.ShowDialog() == true)
             {
-                Text = "Data Source Name",
-                FontSize = 14,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
+                SelectedFilePathBox.Text = openFileDialog.FileName;
+                SelectedFilePathBox.ToolTip = openFileDialog.FileName;
+                SelectedFilePathBox.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(228, 233, 236));
+            }
+        }
 
-            var nameInput = new TextBox
+        private void CancelDataSourceButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResetDataSourceForm();
+            DataSourceTabs.SelectedItem = DataSourceListTab;
+        }
+
+        private void ResetDataSourceForm()
+        {
+            DataSourceNameInput.Clear();
+            DataUrlInput.Clear();
+            ResourceUrlInput.Clear();
+            AppTokenInput.Clear();
+            SelectedFilePathBox.Text = "No file selected";
+            SelectedFilePathBox.ToolTip = null;
+            SelectedFilePathBox.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(158, 171, 180));
+            RealtimeRadio.IsChecked = true;
+            DataSourceFormStatus.Text = "All fields are required for API sources.";
+        }
+
+        private void SaveDataSourceButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                Name = "DataSourceNameInput",
-                Width = 400,
-                Height = 25,
-                Margin = new Thickness(0, 0, 0, 15)
-            };
-            mainStackPanel.Children.Add(nameInput);
-
-            // Real-time Data Radio Buttons
-            mainStackPanel.Children.Add(new TextBlock
-            {
-                Text = "Data Type",
-                FontSize = 14,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
-
-            var realtimePanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 15)
-            };
-
-            var realtimeRadio = new RadioButton
-            {
-                Content = "Real-time Data (API)",
-                Name = "RealtimeRadio",
-                IsChecked = true,
-                Margin = new Thickness(0, 0, 20, 0),
-                VerticalAlignment = System.Windows.VerticalAlignment.Center
-            };
-
-            var staticRadio = new RadioButton
-            {
-                Content = "Local Data (CSV File)",
-                Name = "StaticRadio",
-                Margin = new Thickness(0, 0, 0, 0),
-                VerticalAlignment = System.Windows.VerticalAlignment.Center
-            };
-
-            realtimePanel.Children.Add(realtimeRadio);
-            realtimePanel.Children.Add(staticRadio);
-            mainStackPanel.Children.Add(realtimePanel);
-
-            // Real-time Data Fields (initially visible)
-            var realtimeFieldsPanel = new StackPanel
-            {
-                Name = "RealtimeFieldsPanel",
-                Margin = new Thickness(0, 0, 0, 15)
-            };
-
-            realtimeFieldsPanel.Children.Add(new TextBlock
-            {
-                Text = "Data URL",
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
-
-            var dataUrlInput = new TextBox
-            {
-                Name = "DataUrlInput",
-                Width = 400,
-                Height = 25,
-                Margin = new Thickness(0, 0, 0, 10),
-                ToolTip = "Enter the API endpoint URL for real-time data"
-            };
-            realtimeFieldsPanel.Children.Add(dataUrlInput);
-
-            realtimeFieldsPanel.Children.Add(new TextBlock
-            {
-                Text = "Resource URL",
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
-
-            var resourceUrlInput = new TextBox
-            {
-                Name = "ResourceUrlInput",
-                Width = 400,
-                Height = 25,
-                Margin = new Thickness(0, 0, 0, 10),
-                ToolTip = "Enter the resource identifier (e.g., dataset ID)"
-            };
-            realtimeFieldsPanel.Children.Add(resourceUrlInput);
-
-            realtimeFieldsPanel.Children.Add(new TextBlock
-            {
-                Text = "App Token",
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
-
-            var appTokenInput = new TextBox
-            {
-                Name = "AppTokenInput",
-                Width = 400,
-                Height = 25,
-                Margin = new Thickness(0, 0, 0, 10),
-                ToolTip = "Enter the app token (e.g., app ID)"
-            };
-            realtimeFieldsPanel.Children.Add(appTokenInput);
-
-            mainStackPanel.Children.Add(realtimeFieldsPanel);
-
-            // Static Data Fields (initially hidden)
-            var staticFieldsPanel = new StackPanel
-            {
-                Name = "StaticFieldsPanel",
-                Visibility = Visibility.Collapsed,
-                Margin = new Thickness(0, 0, 0, 15)
-            };
-
-            staticFieldsPanel.Children.Add(new TextBlock
-            {
-                Text = "CSV File Path",
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
-                Margin = new Thickness(0, 0, 0, 5)
-            });
-
-            var filePathPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 10)
-            };
-
-            var filePathLabel = new Label
-            {
-                Name = "FilePathLabel",
-                Content = "No file selected",
-                Width = 300,
-                Height = 25,
-                Background = Brushes.LightGray,
-                BorderBrush = Brushes.Gray,
-                BorderThickness = new Thickness(1),
-                VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
-                Padding = new Thickness(5, 0, 5, 0)
-            };
-
-            var browseButton = new Button
-            {
-                Content = "Browse...",
-                Width = 80,
-                Height = 25,
-                Margin = new Thickness(10, 0, 0, 0)
-            };
-
-            // Browse button click event
-            browseButton.Click += (s, args) =>
-            {
-                var openFileDialog = new Microsoft.Win32.OpenFileDialog
+                string name = DataSourceNameInput.Text.Trim();
+                if (string.IsNullOrWhiteSpace(name))
                 {
-                    Title = "Select CSV Data File",
-                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                    FilterIndex = 1,
-                    RestoreDirectory = true
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    filePathLabel.Content = openFileDialog.FileName;
-                    filePathLabel.ToolTip = openFileDialog.FileName;
+                    MessageBox.Show("Enter a name for this data source.", "Name Required",
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    DataSourceNameInput.Focus();
+                    return;
                 }
-            };
 
-            filePathPanel.Children.Add(filePathLabel);
-            filePathPanel.Children.Add(browseButton);
-            staticFieldsPanel.Children.Add(filePathPanel);
-
-            mainStackPanel.Children.Add(staticFieldsPanel);
-
-            // Radio button event handlers to show/hide fields
-            realtimeRadio.Checked += (s, args) =>
-            {
-                realtimeFieldsPanel.Visibility = Visibility.Visible;
-                staticFieldsPanel.Visibility = Visibility.Collapsed;
-            };
-
-            staticRadio.Checked += (s, args) =>
-            {
-                realtimeFieldsPanel.Visibility = Visibility.Collapsed;
-                staticFieldsPanel.Visibility = Visibility.Visible;
-            };
-
-            // Save and Cancel buttons
-            var buttonPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
-                Margin = new Thickness(0, 20, 0, 0)
-            };
-
-            var saveButton = new Button
-            {
-                Content = "💾 Save Data Source",
-                //Style = FindResource("HeaderButtonStyle") as Style,
-                Width = 180,
-                Margin = new Thickness(0, 0, 10, 0)
-            };
-
-            buttonPanel.Children.Add(saveButton);
-            mainStackPanel.Children.Add(buttonPanel);
-
-            var newTab = new TabItem
-            {
-                Header = $"➕ New Data Source",
-                Content = new ScrollViewer
+                if (_dataSources != null && _dataSources.Any(ds => string.Equals(ds.Name, name, StringComparison.OrdinalIgnoreCase)))
                 {
-                    Content = mainStackPanel,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
+                    MessageBox.Show($"A data source named '{name}' already exists. Enter a different name or delete the existing source first.",
+                                  "Name Already Used", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    DataSourceNameInput.Focus();
+                    DataSourceNameInput.SelectAll();
+                    return;
                 }
-            };
 
+                bool isRealtime = RealtimeRadio.IsChecked == true;
+                string dataUrl;
+                string resourceUrl;
+                string appToken = "";
 
-            // Save button click event
-            saveButton.Click += (s, args) =>
-            {
-                try
+                if (isRealtime)
                 {
-                    // Validate input
-                    if (string.IsNullOrWhiteSpace(nameInput.Text))
+                    if (string.IsNullOrWhiteSpace(DataUrlInput.Text))
                     {
-                        MessageBox.Show("Data source name is required.", "Validation Error",
-                                      MessageBoxButton.OK, MessageBoxImage.Warning);
-                        nameInput.Focus();
+                        MessageBox.Show("Enter the API data URL.", "Data URL Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        DataUrlInput.Focus();
                         return;
                     }
-
-                    bool isRealtime = realtimeRadio.IsChecked == true;
-                    string dataUrl = "";
-                    string resourceUrl = "";
-                    string appToken = "";
-
-                    if (isRealtime)
+                    if (string.IsNullOrWhiteSpace(ResourceUrlInput.Text))
                     {
-                        // Validate real-time fields
-                        if (string.IsNullOrWhiteSpace(dataUrlInput.Text))
-                        {
-                            MessageBox.Show("Data URL is required for real-time data sources.", "Validation Error",
-                                          MessageBoxButton.OK, MessageBoxImage.Warning);
-                            dataUrlInput.Focus();
-                            return;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(resourceUrlInput.Text))
-                        {
-                            MessageBox.Show("Resource URL is required for real-time data sources.", "Validation Error",
-                                          MessageBoxButton.OK, MessageBoxImage.Warning);
-                            resourceUrlInput.Focus();
-                            return;
-                        }
-
-                        if (string.IsNullOrWhiteSpace(appTokenInput.Text))
-                        {
-                            MessageBox.Show("App Token is required for real-time data sources.", "Validation Error",
-                                          MessageBoxButton.OK, MessageBoxImage.Warning);
-                            appTokenInput.Focus();
-                            return;
-                        }
-
-                        dataUrl = dataUrlInput.Text.Trim();
-                        resourceUrl = resourceUrlInput.Text.Trim();
-                        appToken = appTokenInput.Text.Trim();
-
+                        MessageBox.Show("Enter the resource URL or dataset ID.", "Resource Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        ResourceUrlInput.Focus();
+                        return;
                     }
-                    else
+                    if (string.IsNullOrWhiteSpace(AppTokenInput.Password))
                     {
-                        // Validate static file field
-                        string? filePath = filePathLabel.Content?.ToString();
-                        if (string.IsNullOrEmpty(filePath) || filePath == "No file selected")
-                        {
-                            MessageBox.Show("Please select a CSV file for static data sources.", "Validation Error",
-                                          MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
-
-                        if (!File.Exists(filePath))
-                        {
-                            MessageBox.Show("The selected file does not exist.", "File Error",
-                                          MessageBoxButton.OK, MessageBoxImage.Error);
-                            return;
-                        }
-
-                        dataUrl = filePath;
-                        resourceUrl = "local";
+                        MessageBox.Show("Enter the app token used by this API.", "App Token Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        AppTokenInput.Focus();
+                        return;
                     }
-
-                    // Check for duplicate names in memory collection
-                    if (_dataSources != null && _dataSources.Any(predicate: ds => string.Equals(ds.Name, nameInput.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
-                    {
-                        var result = MessageBox.Show(
-                            $"A data source with the name '{nameInput.Text.Trim()}' already exists.\nDo you want to overwrite it?",
-                            "Duplicate Name",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
-
-                        if (result != MessageBoxResult.Yes)
-                        {
-                            return;
-                        }
-                    }
-
-                    // Save to database
-                    bool success = AddDataSourceToDatabase(
-                        nameInput.Text.Trim(),
-                        dataUrl,
-                        resourceUrl,
-                        appToken,
-                        isRealtime);
-
-                    if (success)
-                    {
-                        // Refresh data sources
-                        RefreshDataSourcesList();
-
-                        // Close the tab
-                        DataSourceTabs.Items.Remove(newTab);
-                        DataSourceTabs.SelectedIndex = 0;
-
-                        // Show success message
-                        MessageBox.Show(
-                            $"Data source '{nameInput.Text.Trim()}' has been saved successfully!\n\n" +
-                            $"Type: {(isRealtime ? "Real-time" : "Static")}\n" +
-                            $"Data: {(isRealtime ? dataUrl : Path.GetFileName(dataUrl))}",
-                            "Success",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Information);
-                    }
-                    else
-                    {
-                        MessageBox.Show("Failed to save the data source. Please check the database connection.",
-                                      "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    dataUrl = DataUrlInput.Text.Trim();
+                    resourceUrl = ResourceUrlInput.Text.Trim();
+                    appToken = AppTokenInput.Password;
                 }
-                catch (Exception ex)
+                else
                 {
-                    MessageBox.Show($"An error occurred while saving the data source:\n\n{ex.Message}",
-                                  "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    string filePath = SelectedFilePathBox.Text.Trim();
+                    if (string.IsNullOrWhiteSpace(filePath) || filePath == "No file selected")
+                    {
+                        MessageBox.Show("Choose a CSV file before saving.", "CSV File Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (!File.Exists(filePath))
+                    {
+                        MessageBox.Show("The selected CSV file can no longer be found. Choose the file again.",
+                                      "CSV File Not Found", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    dataUrl = filePath;
+                    resourceUrl = "local";
                 }
-            };
 
+                if (AddDataSourceToDatabase(name, dataUrl, resourceUrl, appToken, isRealtime))
+                {
+                    RefreshDataSourcesList();
+                    ResetDataSourceForm();
+                    DataSourceTabs.SelectedItem = DataSourceListTab;
+                    MessageBox.Show($"'{name}' is ready to use in reports and notebooks.", "Data Source Saved",
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
 
+                MessageBox.Show("ForeSITE could not save this data source. Check the values and try again.",
+                              "Unable to Save", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"ForeSITE could not save this data source.\n\n{ex.Message}",
+                              "Unable to Save", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-            DataSourceTabs.Items.Add(newTab);
-            DataSourceTabs.SelectedItem = newTab;
+        private void DataSourceTable_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            DeleteDataSourceButton.IsEnabled = DataSourceTable.SelectedItem is DataSource;
         }
 
         private void DeleteDataSourceButton_Click(object sender, RoutedEventArgs e)
@@ -802,14 +937,11 @@ namespace ForeSITETestApp
                     return;
                 }
 
-                // Choose Save File Dialog
-                var sfd = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "JSON Template (*.json)|*.json",
-                    DefaultExt = "json",
-                    FileName = "report_template.json"
-                };
-                if (sfd.ShowDialog() != true)
+                string reportName = Interaction.InputBox(
+                    "Name this report. It will appear in Report Library.",
+                    "Save & Schedule Report",
+                    $"Surveillance Report {DateTime.Today:yyyy-MM-dd}").Trim();
+                if (string.IsNullOrWhiteSpace(reportName))
                     return;
 
 
@@ -817,7 +949,8 @@ namespace ForeSITETestApp
                 {
                     ["templateVersion"] = "1.0",
                     ["createdAt"] = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
-                    ["app"] = "ForeSITETestApp",
+                    ["app"] = "ForeSITE",
+                    ["name"] = reportName,
                     ["canvas"] = new JObject
                     {
                         ["width"] = Math.Max(DrawingCanvas.ActualWidth, 778),
@@ -917,7 +1050,10 @@ namespace ForeSITETestApp
                 };
 
 
-                File.WriteAllText(sfd.FileName, root.ToString(Newtonsoft.Json.Formatting.Indented));
+                string definitionJson = root.ToString(Newtonsoft.Json.Formatting.Indented);
+                string definitionPath = Path.Combine(
+                    AppPaths.ReportDefinitionsDirectory,
+                    $"report_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.json");
 
                 // ========== 2) write into scheduler  ==========
                 // from x:Name="RecipientEmailsBox"
@@ -932,21 +1068,36 @@ namespace ForeSITETestApp
                     recipients = string.Join(",", lines);
                 }
 
+                string deliveryMethod = GetSelectedDeliveryMethod();
+                if (deliveryMethod == "Email" && string.IsNullOrWhiteSpace(recipients))
+                {
+                    MessageBox.Show("Enter at least one recipient email address before creating an Email schedule.",
+                                    "Recipient Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    RecipientEmailsBox.Focus();
+                    return;
+                }
+
+                File.WriteAllText(definitionPath, definitionJson);
+                int reportId = DBHelper.InsertReport(reportName, definitionJson);
+
                 var task = new SchedulerTask
                 {
+                    ReportId = reportId,
                     Recipients = recipients,          // allow null or empty
-                    AttachmentPath = sfd.FileName,        // full path to the saved template
+                    AttachmentPath = definitionPath,
                     StartDate = scheduleStart ?? "", // "YYYY-MM-DD"
-                    Freq = scheduleFreq ?? ""  // "By Week"/"daily"/"weekly"/...
+                    Freq = scheduleFreq ?? "",  // "By Week"/"daily"/"weekly"/...
+                    DeliveryMethod = deliveryMethod
                 };
 
                 bool ok = DBHelper.InsertScheduler(task);
                 if (ok)
                 {
                     RefreshSchedulerUI();
+                    RefreshReportLibrary(selectReportId: reportId);
 
 
-                    MessageBox.Show("Template saved and scheduler record inserted.",
+                    MessageBox.Show("Report saved to the library and its schedule was created.",
                                     "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
@@ -978,8 +1129,7 @@ namespace ForeSITETestApp
             {
                 SchedulerTable.ItemsSource = latest;
             }
-
-
+            UpdateSchedulerSelectionState();
         }
 
 
@@ -1025,6 +1175,8 @@ namespace ForeSITETestApp
             string? threshold = null;
             string? useTrainSplit = null;
             string? trainEndDate = null;
+            string? baseline = null;
+            string? mcMunu = null;
 
             static string? S(JToken? token) => token?.ToString();
 
@@ -1047,6 +1199,8 @@ namespace ForeSITETestApp
                     threshold = S(g["threshold"]);
                     useTrainSplit = S(g["useTrainSplit"]);
                     trainEndDate = S(g["trainEndDate"]);
+                    baseline = S(g["baseline"]);
+                    mcMunu = S(g["mc_munu"]);
                 }
             }
             catch { /*  */ }
@@ -1066,6 +1220,8 @@ namespace ForeSITETestApp
             if (!string.IsNullOrEmpty(threshold)) o["threshold"] = threshold;
             if (!string.IsNullOrEmpty(useTrainSplit)) o["useTrainSplit"] = useTrainSplit;
             if (!string.IsNullOrEmpty(trainEndDate)) o["trainEndDate"] = trainEndDate;
+            if (!string.IsNullOrEmpty(baseline)) o["baseline"] = baseline;
+            if (!string.IsNullOrEmpty(mcMunu)) o["mc_munu"] = mcMunu;
 
             return o;
         }
@@ -1992,11 +2148,11 @@ namespace ForeSITETestApp
                 };
 
                 var content = new StringContent(requestData.ToString(), Encoding.UTF8, "application/json");
-                HttpResponseMessage response = await _httpClient.PostAsync("http://127.0.0.1:5001/epyapi", content);
+                HttpResponseMessage response = await _httpClient.PostAsync("/epyapi", content);
+                string responseContent = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
-                    string responseContent = await response.Content.ReadAsStringAsync();
                     try
                     {
                         JObject responseJson = JObject.Parse(responseContent);
@@ -2172,7 +2328,29 @@ namespace ForeSITETestApp
                 }
                 else
                 {
-                    MessageBox.Show($"Failed to generate plot. Status: {response.StatusCode}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    string serverMessage = responseContent;
+                    try
+                    {
+                        JObject errorJson = JObject.Parse(responseContent);
+                        serverMessage = errorJson["message"]?.ToString()
+                            ?? errorJson["error"]?.ToString()
+                            ?? responseContent;
+                    }
+                    catch (Newtonsoft.Json.JsonException)
+                    {
+                        serverMessage = System.Net.WebUtility.HtmlDecode(
+                            Regex.Replace(responseContent, "<[^>]+>", " "));
+                        serverMessage = Regex.Replace(serverMessage, @"\s+", " ").Trim();
+                    }
+
+                    if (serverMessage.Length > 800)
+                        serverMessage = serverMessage[..800] + "…";
+
+                    MessageBox.Show(
+                        $"Failed to generate plot ({(int)response.StatusCode} {response.ReasonPhrase}).\n\n{serverMessage}",
+                        "Report Generation Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
                 }
             }
             catch (Exception ex)
@@ -2215,7 +2393,7 @@ namespace ForeSITETestApp
             string baseDir = AppContext.BaseDirectory;
             string serverDir = Path.Combine(baseDir, "Server");
             string scriptPath = Path.Combine(serverDir, "cdc_backtest.py");
-            string configPath = Path.Combine(serverDir, "config.json");
+            string configPath = AppPaths.ConfigPath;
 
             if (!File.Exists(scriptPath))
             {
@@ -2225,19 +2403,12 @@ namespace ForeSITETestApp
             }
 
             string pythonPath = "python";
-            string appToken = string.Empty;
             try
             {
                 if (File.Exists(configPath))
                 {
                     var cfg = JObject.Parse(File.ReadAllText(configPath));
                     pythonPath = cfg.Value<string>("pythonPath")?.Trim() ?? pythonPath;
-                    appToken =
-                        cfg.Value<string>("FORESITE_CDC_APP_TOKEN")?.Trim()
-                        ?? cfg.Value<string>("foresite_cdc_app_token")?.Trim()
-                        ?? cfg.Value<string>("cdcAppToken")?.Trim()
-                        ?? cfg.Value<string>("appToken")?.Trim()
-                        ?? string.Empty;
                 }
             }
             catch (Exception ex)
@@ -2246,12 +2417,9 @@ namespace ForeSITETestApp
                     "Config Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
-            if (string.IsNullOrWhiteSpace(appToken))
-            {
-                appToken = DBHelper.GetAllDataSources()
-                    .FirstOrDefault(ds => string.Equals(ds.Name, "COVID-19 Deaths", StringComparison.OrdinalIgnoreCase))
-                    ?.AppToken ?? string.Empty;
-            }
+            string appToken = DBHelper.GetAllDataSources()
+                .FirstOrDefault(ds => string.Equals(ds.Name, selectedSource, StringComparison.OrdinalIgnoreCase))
+                ?.AppToken ?? string.Empty;
 
             if (!File.Exists(pythonPath) && string.Equals(pythonPath, "python", StringComparison.OrdinalIgnoreCase) == false)
             {
@@ -2614,6 +2782,7 @@ namespace ForeSITETestApp
 
                 var view = CollectionViewSource.GetDefaultView(SchedulerTable.ItemsSource);
                 view?.Refresh();
+                UpdateSchedulerSelectionState();
             }
             catch (Exception ex)
             {
@@ -2659,21 +2828,32 @@ namespace ForeSITETestApp
                 }
 
                 int ok = 0, fail = 0;
+                string deliveryMethod = GetSelectedDeliveryMethod();
                 foreach (var row in selectedRows)
                 {
 
-                    string recipients = bulkRecipients ?? (row.Recipients ?? string.Empty);
+                    string recipients = deliveryMethod == "Email"
+                        ? bulkRecipients ?? (row.Recipients ?? string.Empty)
+                        : row.Recipients ?? string.Empty;
+                    if (deliveryMethod == "Email" && string.IsNullOrWhiteSpace(recipients))
+                    {
+                        MessageBox.Show($"Scheduler row {row.Id} needs at least one recipient email address.",
+                                        "Recipient Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        RecipientEmailsBox.Focus();
+                        return;
+                    }
                     string attachPath = row.AttachmentPath ?? string.Empty;
                     string startDate = row.StartDate ?? string.Empty;   // YYYY-MM-DD
                     string freq = row.Freq ?? string.Empty;
 
-                    if (DBHelper.UpdateScheduler(row.Id, recipients, attachPath, startDate, freq))
+                    if (DBHelper.UpdateScheduler(row.Id, recipients, attachPath, startDate, freq, deliveryMethod))
                     {
                         // update successful, update the memory object too
                         row.Recipients = recipients;
                         row.AttachmentPath = attachPath;
                         row.StartDate = startDate;
                         row.Freq = freq;
+                        row.DeliveryMethod = deliveryMethod;
                         ok++;
                     }
                     else
@@ -2755,13 +2935,6 @@ namespace ForeSITETestApp
 
             try
             {
-                if (TaskExists(TaskName))
-                {
-                    MessageBox.Show($"Task '{TaskName}' already exists.", "Scheduler");
-                    UpdateSchedulerButtons();
-                    return;
-                }
-
                 // ComboBox read time
                 if (HourSelector.SelectedItem == null || MinuteSelector.SelectedItem == null)
                 {
@@ -2773,12 +2946,12 @@ namespace ForeSITETestApp
                 string minute = MinuteSelector.SelectedItem?.ToString() ?? "00";
                 string startTime = $"{hour}:{minute}";
 
-                string args = $"/create /tn {TaskName} /tr \"\\\"{exePath}\\\"\" /sc daily /st {startTime} /f";
+                string args = $"/create /tn {TaskName} /tr \"\\\"{exePath}\\\"\" /sc daily /st {startTime} /it /f";
                 var (exit, stdout, stderr) = RunSchTasks(args);
 
                 if (exit == 0)
                 {
-                    MessageBox.Show($"Task '{TaskName}' was successfully set to run daily at {startTime}.",
+                    MessageBox.Show($"Task '{TaskName}' was set to run daily at {startTime} while this user is signed in.",
                                     "Scheduler", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 else
@@ -2847,7 +3020,13 @@ namespace ForeSITETestApp
 
                         if (this.FindName("RecipientEmailsBox") is TextBox box)
                             box.Text = string.Join(Environment.NewLine, lines);
+
+                        DeliveryMethodSelector.SelectedIndex =
+                            string.Equals(row.DeliveryMethod, "Notification", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                     }
+
+                    Dispatcher.BeginInvoke(new Action(UpdateSchedulerSelectionState),
+                        System.Windows.Threading.DispatcherPriority.Background);
                 }
             }
             catch (Exception ex)
@@ -2855,6 +3034,41 @@ namespace ForeSITETestApp
                 MessageBox.Show($"Error handling checkbox click: {ex.Message}",
                                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void UpdateSchedulerSelectionState()
+        {
+            int selectedCount = SchedulerTable.ItemsSource is IEnumerable<SchedulerTask> tasks
+                ? tasks.Count(task => task.IsSelected)
+                : 0;
+
+            SchedulerSelectionSummary.Text = $"{selectedCount} SELECTED";
+            SchedulerSaveButton.IsEnabled = selectedCount > 0;
+            SchedulerDeleteButton.IsEnabled = selectedCount > 0;
+            SchedulerEmptyState.Visibility = SchedulerTable.Items.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private string GetSelectedDeliveryMethod()
+        {
+            return DeliveryMethodSelector.SelectedItem is ComboBoxItem item &&
+                   string.Equals(item.Content?.ToString(), "Notification", StringComparison.OrdinalIgnoreCase)
+                ? "Notification"
+                : "Email";
+        }
+
+        private void DeliveryMethodSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (RecipientEmailsBox == null || RecipientEmailsLabel == null)
+                return;
+
+            bool emailSelected = GetSelectedDeliveryMethod() == "Email";
+            RecipientEmailsBox.IsEnabled = emailSelected;
+            RecipientEmailsBox.Opacity = emailSelected ? 1.0 : 0.55;
+            RecipientEmailsLabel.Text = emailSelected
+                ? "RECIPIENT EMAILS · ONE PER LINE"
+                : "RECIPIENT EMAILS · NOT USED FOR NOTIFICATIONS";
         }
 
         private void ModelSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2900,10 +3114,11 @@ namespace ForeSITETestApp
 
         private void SetupButton_Click(object sender, RoutedEventArgs e)
         {
-            HeaderTitle.Text = "Setup";
-            DefaultContentGrid.Visibility = Visibility.Collapsed;
+            SetActiveNavigation(SettingButton);
+            HeaderTitle.Text = "Settings";
             SchedulerGrid.Visibility = Visibility.Collapsed;
             ReportsGrid.Visibility = Visibility.Collapsed;
+            ReportLibraryGrid.Visibility = Visibility.Collapsed;
             DataSourceGrid.Visibility = Visibility.Collapsed;
             ModelGrid.Visibility = Visibility.Collapsed;
 
@@ -2911,6 +3126,26 @@ namespace ForeSITETestApp
 
             LoadSystemConfigIntoUi();
             LoadLlmConfigIntoUi();
+        }
+
+        private void SetActiveNavigation(Button activeButton)
+        {
+            Button[] navigationButtons =
+            {
+                ReportButton,
+                SchedulerButton,
+                DataSourceButton,
+                ModelButton,
+                SettingButton
+            };
+
+            foreach (Button button in navigationButtons)
+            {
+                button.Tag = ReferenceEquals(button, activeButton) ? "Active" : null;
+            }
+            ReportModeButtons.Visibility = ReferenceEquals(activeButton, ReportButton)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         // ---------------------------
@@ -2934,8 +3169,8 @@ namespace ForeSITETestApp
 
         private string GetLlmConfigPath()
         {
-            // keep it next to the exe so Task Scheduler / installed app can find it consistently
-            return Path.Combine(AppContext.BaseDirectory, LlmConfigFileName);
+            AppPaths.EnsureInitialized();
+            return AppPaths.LlmConfigPath;
         }
 
         private static string ProtectApiKey(string plainText)
@@ -2967,7 +3202,8 @@ namespace ForeSITETestApp
 
         private string GetSystemConfigPath()
         {
-            return Path.Combine(AppContext.BaseDirectory, "Server", "config.json");
+            AppPaths.EnsureInitialized();
+            return AppPaths.ConfigPath;
         }
 
         private void LoadSystemConfigIntoUi()
@@ -3025,7 +3261,7 @@ namespace ForeSITETestApp
             LoadSystemConfigIntoUi();
             if (SystemConfigStatusText != null)
             {
-                SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50));
+                SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(129, 199, 132));
                 SystemConfigStatusText.Text = "Refreshed";
             }
         }
@@ -3071,8 +3307,15 @@ namespace ForeSITETestApp
                 {
                     if (string.IsNullOrWhiteSpace(entry.Key))
                         continue;
+                    if (entry.Key.Equals("password", StringComparison.OrdinalIgnoreCase))
+                    {
+                        obj[entry.Key] = "";
+                        continue;
+                    }
                     obj[entry.Key] = ConvertEntryValue(entry);
                 }
+
+                obj["passwordEnvironmentVariable"] = "FORESITE_SMTP_PASSWORD";
 
                 Directory.CreateDirectory(Path.GetDirectoryName(path) ?? AppContext.BaseDirectory);
                 File.WriteAllText(path, obj.ToString());
@@ -3080,15 +3323,15 @@ namespace ForeSITETestApp
 
                 if (SystemConfigStatusText != null)
                 {
-                    SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50));
-                    SystemConfigStatusText.Text = "Saved to config.json";
+                    SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(129, 199, 132));
+                    SystemConfigStatusText.Text = "Saved. SMTP password is read from FORESITE_SMTP_PASSWORD.";
                 }
             }
             catch (Exception ex)
             {
                 if (SystemConfigStatusText != null)
                 {
-                    SystemConfigStatusText.Foreground = Brushes.DarkRed;
+                    SystemConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 154, 154));
                     SystemConfigStatusText.Text = ex.Message;
                 }
                 MessageBox.Show($"Failed to save system config: {ex.Message}", "Setup",
@@ -3146,7 +3389,7 @@ namespace ForeSITETestApp
 
                 if (LlmConfigStatusText != null)
                 {
-                    LlmConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50)); // green-ish
+                    LlmConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(129, 199, 132));
                     LlmConfigStatusText.Text = $"Saved to {LlmConfigFileName}";
                 }
             }
@@ -3154,7 +3397,7 @@ namespace ForeSITETestApp
             {
                 if (LlmConfigStatusText != null)
                 {
-                    LlmConfigStatusText.Foreground = Brushes.DarkRed;
+                    LlmConfigStatusText.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(239, 154, 154));
                     LlmConfigStatusText.Text = ex.Message;
                 }
                 MessageBox.Show($"Failed to save LLM config: {ex.Message}", "Setup",

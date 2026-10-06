@@ -28,7 +28,8 @@ namespace ForeSITEScheduler
             string host = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "";
             string portStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "";
             string user = Environment.GetEnvironmentVariable("SMTP_USER") ?? "";
-            string pass = Environment.GetEnvironmentVariable("SMTP_PASS") ?? "";
+            string pass = Environment.GetEnvironmentVariable("FORESITE_SMTP_PASSWORD")
+                          ?? Environment.GetEnvironmentVariable("SMTP_PASS") ?? "";
             string from = Environment.GetEnvironmentVariable("SMTP_FROM") ?? "";
             string enableSslStr = Environment.GetEnvironmentVariable("SMTP_ENABLE_SSL") ?? "";
 
@@ -54,9 +55,9 @@ namespace ForeSITEScheduler
             }
 
             // 2) read config.json
-            string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            string pythonDirectory = Path.Combine(currentDirectory, "Server");
-            var jsonPath = Path.Combine(pythonDirectory, "config.json");
+            string userDataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForeSITE");
+            var jsonPath = Path.Combine(userDataDirectory, "config.json");
             Console.WriteLine($"Looking for SMTP config in: {jsonPath}");
 
 
@@ -69,7 +70,7 @@ namespace ForeSITEScheduler
                     Port = int.TryParse(jo["port"]?.ToString(), out var p) ? p : 587,
                     EnableSsl = jo["enableSsl"]?.ToObject<bool?>() ?? true,
                     Username = jo["username"]?.ToString() ?? "",
-                    Password = jo["password"]?.ToString() ?? "",
+                    Password = pass,
                     From = jo["from"]?.ToString() ?? "",
                     FromDisplay = jo["fromDisplay"]?.ToString()
                 };

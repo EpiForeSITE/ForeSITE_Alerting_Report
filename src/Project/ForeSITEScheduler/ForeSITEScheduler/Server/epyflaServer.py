@@ -1301,10 +1301,8 @@ def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
     Returns:
         pandas.DataFrame: A DataFrame containing the fetched data, or None if an error occurs.
     """
-    try:
-        #app_token="Wa9PucgUy1cHNJgzoTZwhg9AY"
-        client = Socrata(domain, app_token=app_token, timeout=timeout)
-
+    def fetch_all(token):
+        client = Socrata(domain, app_token=token or None, timeout=timeout)
         all_results = []
         offset = 0
         while True:
@@ -1313,13 +1311,34 @@ def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
                 break
             all_results.extend(results)
             offset += limit  # Increment the offset for the next chunk
+        return all_results
 
+    try:
+        all_results = fetch_all(app_token)
         if not all_results:
             safe_log(f"No rows returned from Socrata dataset {dataset_id} on {domain}")
             return None
         results_df = pd.DataFrame.from_records(all_results)
         return results_df
     except requests.exceptions.RequestException as e:
+        error_text = str(e).lower()
+        rejected_token = bool(app_token) and (
+            "invalid app_token" in error_text
+            or "invalid app token" in error_text
+            or "unauthorized" in error_text
+            or "401" in error_text
+            or "403" in error_text
+        )
+        if rejected_token:
+            safe_log("Stored Socrata app token was rejected; retrying the public dataset anonymously.", "warning")
+            try:
+                all_results = fetch_all(None)
+                if all_results:
+                    return pd.DataFrame.from_records(all_results)
+                safe_log(f"No rows returned from Socrata dataset {dataset_id} during anonymous retry.")
+                return None
+            except requests.exceptions.RequestException as retry_error:
+                safe_log(f"Anonymous Socrata retry failed: {retry_error}")
         safe_log(f"Error fetching data: {e}")
         return None
 
@@ -1955,6 +1974,7 @@ def process_json():
              )
             return jsonify({
                 "status": "processed",
+                "abnormal": is_abnormal,
                 "message": "Design mode enabled; plot generated.",
                 "plot_path": save_img_path
              }), 200

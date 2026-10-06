@@ -20,6 +20,7 @@ import os
 import tempfile
 import uuid
 import base64
+import hmac
 
 import sqlite3
 
@@ -49,10 +50,13 @@ def load_config_and_setup_r():
     try:
         # Get current script directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(script_dir, "config.json")
+        config_path = os.environ.get(
+            "FORESITE_CONFIG_PATH", os.path.join(script_dir, "config.json")
+        )
         
         if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
+            # utf-8-sig accepts both ordinary UTF-8 and Windows-authored files with BOM.
+            with open(config_path, 'r', encoding='utf-8-sig') as f:
                 config = json.load(f)
             
             r_path = config.get('RPath', '')
@@ -176,8 +180,18 @@ except Exception as e:
 # Create the Flask application instance
 app = Flask(__name__)
 
+@app.before_request
+def authorize_local_request():
+    """Accept only this desktop process's authenticated loopback client."""
+    if request.remote_addr not in ("127.0.0.1", "::1"):
+        abort(403, description="Only loopback requests are allowed.")
+    supplied_token = request.headers.get("X-ForeSITE-Token", "")
+    if not API_TOKEN or not hmac.compare_digest(supplied_token, API_TOKEN):
+        abort(403, description="Invalid local API token.")
+
 # Define the port the application will run on
-PORT = 5001 # Using 5001 to avoid potential conflicts with default 5000
+PORT = int(os.environ.get("FORESITE_PORT", "5001"))
+API_TOKEN = os.environ.get("FORESITE_API_TOKEN", "")
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -223,12 +237,18 @@ def ensure_rpy2_conversion_context():
 
 
 # Database configuration
-DATABASE_PATH = os.path.join(os.getcwd(), "foresite_alerting.db")
+DATABASE_PATH = os.environ.get(
+    "FORESITE_DATABASE_PATH", os.path.join(os.getcwd(), "foresite_alerting.db")
+)
 print(f"Database path: {DATABASE_PATH}")
 
-documents_path = os.path.join(os.path.expanduser("~"), "Documents")
+user_data_path = os.environ.get(
+    "FORESITE_DATA_DIR",
+    os.path.join(os.path.expanduser("~"), "AppData", "Local", "ForeSITE"),
+)
+documents_path = os.path.join(user_data_path, "Logs")
 #log_file_path = os.path.join(documents_path, "flask_py_log.txt")
-save_folder = os.path.join(documents_path, "ForeSITEAlertingReportFiles")
+save_folder = os.path.join(user_data_path, "Reports")
 
 # Ensure the directory exists and create the log file
 os.makedirs(documents_path, exist_ok=True)
@@ -1301,10 +1321,8 @@ def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
     Returns:
         pandas.DataFrame: A DataFrame containing the fetched data, or None if an error occurs.
     """
-    try:
-        #app_token="Wa9PucgUy1cHNJgzoTZwhg9AY"
-        client = Socrata(domain, app_token=app_token, timeout=timeout)
-
+    def fetch_all(token):
+        client = Socrata(domain, app_token=token or None, timeout=timeout)
         all_results = []
         offset = 0
         while True:
@@ -1313,6 +1331,10 @@ def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
                 break
             all_results.extend(results)
             offset += limit  # Increment the offset for the next chunk
+        return all_results
+
+    try:
+        all_results = fetch_all(app_token)
 
         if not all_results:
             safe_log(f"No rows returned from Socrata dataset {dataset_id} on {domain}")
@@ -1320,6 +1342,28 @@ def fetchData(domain, dataset_id, app_token=None, limit=5000, timeout=60):
         results_df = pd.DataFrame.from_records(all_results)
         return results_df
     except requests.exceptions.RequestException as e:
+        # Public Socrata datasets can be queried without an application token.
+        # A saved token may later expire or be revoked; retry anonymously instead
+        # of turning that recoverable configuration issue into a report failure.
+        error_text = str(e).lower()
+        rejected_token = bool(app_token) and (
+            "invalid app_token" in error_text
+            or "invalid app token" in error_text
+            or "401 client error" in error_text
+            or "403 client error" in error_text
+        )
+        if rejected_token:
+            safe_log("Stored Socrata app token was rejected; retrying the public dataset anonymously.", "warning")
+            try:
+                all_results = fetch_all(None)
+                if all_results:
+                    return pd.DataFrame.from_records(all_results)
+                safe_log(f"No rows returned from Socrata dataset {dataset_id} during anonymous retry.")
+                return None
+            except requests.exceptions.RequestException as retry_error:
+                safe_log(f"Anonymous Socrata retry failed: {retry_error}")
+                return None
+
         safe_log(f"Error fetching data: {e}")
         return None
 
@@ -1955,6 +1999,7 @@ def process_json():
              )
             return jsonify({
                 "status": "processed",
+                "abnormal": is_abnormal,
                 "message": "Design mode enabled; plot generated.",
                 "plot_path": save_img_path
              }), 200

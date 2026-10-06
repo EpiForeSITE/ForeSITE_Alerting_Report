@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -18,10 +19,9 @@ namespace SchedulerRunner
 
         static DBHelper()
         {
-            // Initialize database path in Python subdirectory
-            string currentDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            string pythonDirectory = Path.Combine(currentDirectory, "Server");
-            DatabasePath = Path.Combine(pythonDirectory, "foresite_alerting.db");
+            string userDataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForeSITE", "Data");
+            DatabasePath = Path.Combine(userDataDirectory, "foresite_alerting.db");
             ConnectionString = $"Data Source={DatabasePath}";
             Console.WriteLine($"Database path set to: {DatabasePath}");
 
@@ -105,8 +105,45 @@ namespace SchedulerRunner
                         Recipients TEXT,
                         AttachmentPath TEXT,
                         StartDate TEXT,
-                        Freq TEXT
+                        Freq TEXT,
+                        DeliveryMethod TEXT NOT NULL DEFAULT 'Email'
                 )";
+                    command.ExecuteNonQuery();
+                }
+                EnsureSchedulerDeliveryMethodColumn(connection);
+                EnsureSchedulerColumn(connection, "ReportId", "INTEGER");
+                EnsureSchedulerColumn(connection, "Enabled", "INTEGER NOT NULL DEFAULT 1");
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS reports (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Name TEXT NOT NULL,
+                        DefinitionJson TEXT NOT NULL,
+                        CreatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        UpdatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        IsArchived INTEGER NOT NULL DEFAULT 0
+                    )";
+                    command.ExecuteNonQuery();
+                }
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS report_runs (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ReportId INTEGER NOT NULL,
+                        SchedulerId INTEGER,
+                        StartedAt TEXT NOT NULL,
+                        CompletedAt TEXT,
+                        DataAsOf TEXT,
+                        Status TEXT NOT NULL,
+                        IsAbnormal INTEGER NOT NULL DEFAULT 0,
+                        PdfPath TEXT,
+                        SnapshotJson TEXT NOT NULL DEFAULT '{}',
+                        ErrorMessage TEXT
+                    )";
                     command.ExecuteNonQuery();
                 }
 
@@ -162,12 +199,11 @@ namespace SchedulerRunner
         /// <returns>Number of rows inserted</returns>
         public static int InsertInitialDataSources()
         {
-            string initialCdcToken = GetInitialCdcAppToken();
            var initialDataSources = new[]
            {
-             new DataSource { Name = "COVID-19 Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", AppToken = initialCdcToken, IsRealtime = true },
-             new DataSource{ Name = "Pneumonia Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", AppToken = initialCdcToken,  IsRealtime = true },
-             new DataSource{ Name = "Flu Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", AppToken = initialCdcToken, IsRealtime = true },
+             new DataSource { Name = "COVID-19 Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", IsRealtime = true },
+             new DataSource{ Name = "Pneumonia Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", IsRealtime = true },
+             new DataSource{ Name = "Flu Deaths", DataURL = "https://data.cdc.gov", ResourceURL = "r8kw-7aab", IsRealtime = true },
              new DataSource{ Name = "COVID-19 Tests", DataURL = "local_covid_19_test_data.csv", ResourceURL = "local", IsRealtime = false }
            };
 
@@ -184,34 +220,6 @@ namespace SchedulerRunner
             return insertedCount;
         }
 
-        private static string GetInitialCdcAppToken()
-        {
-            try
-            {
-                string configPath = Path.Combine(AppContext.BaseDirectory, "Server", "config.json");
-                if (!File.Exists(configPath))
-                    return string.Empty;
-                var root = JObject.Parse(File.ReadAllText(configPath));
-                string[] keys =
-                {
-                    "FORESITE_CDC_APP_TOKEN",
-                    "foresite_cdc_app_token",
-                    "cdcAppToken",
-                    "appToken"
-                };
-                foreach (string key in keys)
-                {
-                    string? token = root[key]?.ToString()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(token))
-                        return token;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to read CDC app token from config.json: {ex.Message}");
-            }
-            return string.Empty;
-        }
         private static string? ResolveInitialModelsPath()
         {
             string baseDir = AppContext.BaseDirectory;
@@ -757,13 +765,14 @@ namespace SchedulerRunner
 
                 using var command = connection.CreateCommand();
                 command.CommandText = @"
-            INSERT INTO scheduler (Recipients, AttachmentPath, StartDate, Freq)
-            VALUES ($recipients, $path, $startDate, $freq)";
+            INSERT INTO scheduler (Recipients, AttachmentPath, StartDate, Freq, DeliveryMethod)
+            VALUES ($recipients, $path, $startDate, $freq, $deliveryMethod)";
 
                 command.Parameters.AddWithValue("$recipients", task.Recipients ?? "");
                 command.Parameters.AddWithValue("$path", task.AttachmentPath ?? "");
                 command.Parameters.AddWithValue("$startDate", task.StartDate ?? "");
                 command.Parameters.AddWithValue("$freq", task.Freq ?? "");
+                command.Parameters.AddWithValue("$deliveryMethod", NormalizeDeliveryMethod(task.DeliveryMethod));
 
                 command.ExecuteNonQuery();
                 return true;
@@ -795,7 +804,7 @@ namespace SchedulerRunner
             }
         }
 
-        public static bool UpdateScheduler(int id, string recipients, string attachmentPath, string startDate, string freq)
+        public static bool UpdateScheduler(int id, string recipients, string attachmentPath, string startDate, string freq, string deliveryMethod)
         {
             try
             {
@@ -808,12 +817,14 @@ namespace SchedulerRunner
                SET Recipients     = $recipients,
                    AttachmentPath = $path,
                    StartDate      = $startDate,
-                   Freq           = $freq
+                   Freq           = $freq,
+                   DeliveryMethod = $deliveryMethod
              WHERE Id             = $id";
                 command.Parameters.AddWithValue("$recipients", recipients ?? string.Empty);
                 command.Parameters.AddWithValue("$path", attachmentPath ?? string.Empty);
                 command.Parameters.AddWithValue("$startDate", startDate ?? string.Empty);
                 command.Parameters.AddWithValue("$freq", freq ?? string.Empty);
+                command.Parameters.AddWithValue("$deliveryMethod", NormalizeDeliveryMethod(deliveryMethod));
                 command.Parameters.AddWithValue("$id", id);
 
                 return command.ExecuteNonQuery() > 0;
@@ -835,7 +846,7 @@ namespace SchedulerRunner
                 connection.Open();
 
                 using var command = connection.CreateCommand();
-                command.CommandText = "SELECT Id, Recipients, AttachmentPath, StartDate, Freq FROM scheduler";
+                command.CommandText = "SELECT Id, ReportId, Recipients, AttachmentPath, StartDate, Freq, DeliveryMethod, Enabled FROM scheduler";
 
                 using var reader = command.ExecuteReader();
                 while (reader.Read())
@@ -843,10 +854,13 @@ namespace SchedulerRunner
                     var task = new SchedulerTask
                     {
                         Id = reader.GetInt32(0),
-                        Recipients = reader.IsDBNull(1) ? null : reader.GetString(1),
-                        AttachmentPath = reader.IsDBNull(2) ? null : reader.GetString(2),
-                        StartDate = reader.IsDBNull(3) ? null : reader.GetString(3),
-                        Freq = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        ReportId = reader.IsDBNull(1) ? null : reader.GetInt32(1),
+                        Recipients = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        AttachmentPath = reader.IsDBNull(3) ? null : reader.GetString(3),
+                        StartDate = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        Freq = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        DeliveryMethod = reader.IsDBNull(6) ? "Email" : NormalizeDeliveryMethod(reader.GetString(6)),
+                        IsEnabled = reader.IsDBNull(7) || reader.GetInt32(7) != 0,
                         IsSelected = false   // 
                     };
                     schedulers.Add(task);
@@ -858,6 +872,120 @@ namespace SchedulerRunner
             }
             return schedulers;
         }
+
+        private static void EnsureSchedulerDeliveryMethodColumn(SqliteConnection connection)
+        {
+            bool exists = false;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA table_info(scheduler)";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (string.Equals(reader.GetString(1), "DeliveryMethod", StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!exists)
+            {
+                using var alter = connection.CreateCommand();
+                alter.CommandText = "ALTER TABLE scheduler ADD COLUMN DeliveryMethod TEXT NOT NULL DEFAULT 'Email'";
+                alter.ExecuteNonQuery();
+            }
+        }
+
+        private static void EnsureSchedulerColumn(SqliteConnection connection, string columnName, string definition)
+        {
+            bool exists = false;
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "PRAGMA table_info(scheduler)";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!exists)
+            {
+                using var alter = connection.CreateCommand();
+                alter.CommandText = $"ALTER TABLE scheduler ADD COLUMN {columnName} {definition}";
+                alter.ExecuteNonQuery();
+            }
+        }
+
+        public static int EnsureReportForScheduler(int schedulerId, string templatePath, string definitionJson)
+        {
+            using var connection = new SqliteConnection(ConnectionString);
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+
+            using var lookup = connection.CreateCommand();
+            lookup.Transaction = transaction;
+            lookup.CommandText = "SELECT ReportId FROM scheduler WHERE Id = $id";
+            lookup.Parameters.AddWithValue("$id", schedulerId);
+            object? current = lookup.ExecuteScalar();
+            if (current is not null && current != DBNull.Value)
+            {
+                transaction.Commit();
+                return Convert.ToInt32(current, CultureInfo.InvariantCulture);
+            }
+
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = @"INSERT INTO reports (Name, DefinitionJson, CreatedAt, UpdatedAt)
+                                   VALUES ($name, $json, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+                                   SELECT last_insert_rowid();";
+            insert.Parameters.AddWithValue("$name", Path.GetFileNameWithoutExtension(templatePath));
+            insert.Parameters.AddWithValue("$json", definitionJson);
+            int reportId = Convert.ToInt32(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE scheduler SET ReportId = $reportId WHERE Id = $id";
+            update.Parameters.AddWithValue("$reportId", reportId);
+            update.Parameters.AddWithValue("$id", schedulerId);
+            update.ExecuteNonQuery();
+            transaction.Commit();
+            return reportId;
+        }
+
+        public static void InsertReportRun(int reportId, int? schedulerId, DateTime startedAt,
+            DateTime completedAt, string status, bool isAbnormal, string? pdfPath,
+            string snapshotJson, string? errorMessage)
+        {
+            using var connection = new SqliteConnection(ConnectionString);
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = @"INSERT INTO report_runs
+                (ReportId, SchedulerId, StartedAt, CompletedAt, DataAsOf, Status, IsAbnormal, PdfPath, SnapshotJson, ErrorMessage)
+                VALUES ($reportId, $schedulerId, $startedAt, $completedAt, $dataAsOf, $status, $isAbnormal, $pdfPath, $snapshotJson, $errorMessage)";
+            command.Parameters.AddWithValue("$reportId", reportId);
+            command.Parameters.AddWithValue("$schedulerId", (object?)schedulerId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$startedAt", startedAt.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$completedAt", completedAt.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$dataAsOf", completedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$status", status);
+            command.Parameters.AddWithValue("$isAbnormal", isAbnormal ? 1 : 0);
+            command.Parameters.AddWithValue("$pdfPath", (object?)pdfPath ?? DBNull.Value);
+            command.Parameters.AddWithValue("$snapshotJson", snapshotJson ?? "{}");
+            command.Parameters.AddWithValue("$errorMessage", (object?)errorMessage ?? DBNull.Value);
+            command.ExecuteNonQuery();
+        }
+
+        private static string NormalizeDeliveryMethod(string? deliveryMethod) =>
+            string.Equals(deliveryMethod, "Notification", StringComparison.OrdinalIgnoreCase)
+                ? "Notification"
+                : "Email";
 
 
         public static int GetmodelsCount()

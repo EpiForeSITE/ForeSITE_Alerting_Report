@@ -32,7 +32,7 @@
             </StackPanel>
 
             <TextBlock Grid.Row="1"
-                       Text="ver. 1.0"
+                       Text="ver. 2.0"
                        FontSize="12"
                        Foreground="#7A7F87"
                        HorizontalAlignment="Right"

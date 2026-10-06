@@ -9,11 +9,11 @@
   "port": 587,
   "enableSsl": true,
   "username": "foresite.alerting@gmail.com",
-  "password": "yzltakafdzegdqbp",
+  "password": "",
+  "passwordEnvironmentVariable": "FORESITE_SMTP_PASSWORD",
   "from": "foresite.alerting@gmail.com",
   "fromDisplay": "ForeSITE Alerting Report",
   "initialized": true,
-  "FORESITE_CDC_APP_TOKEN": "Wa9PucgUy1cHNJgzoTZwhg9AY",
   "rUserPath": "Server\\r_user",
   "rLibsUserPath": "Server\\r_user\\library"
 }

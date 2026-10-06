@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -32,27 +33,42 @@ public partial class MainWindow : Window
     private Dashboard dashboard;
     private Process? flaskProcess; // Declared as nullable to fix CS8618
     private readonly HttpClient _httpClient;
-    private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
+    private readonly int _serverPort;
+    private readonly string _serverToken;
     public static StreamWriter? GlobalLogWriter;
     public MainWindow()
     {
         InitializeComponent();
+        AppPaths.EnsureInitialized();
         DBHelper.InitializeDatabase();
+
+        _serverPort = ReserveAvailablePort();
+        _serverToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
         //Our HTTP doesn't need SSL certificate validation
         _httpClient = new HttpClient()
         {
-            BaseAddress = new Uri(SERVER_BASE_URL),
+            BaseAddress = new Uri($"http://127.0.0.1:{_serverPort}"),
             Timeout = TimeSpan.FromSeconds(60)
         };
 
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "NotebookApp/1.0");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "ForeSITE/2.0");
+        _httpClient.DefaultRequestHeaders.Add("X-ForeSITE-Token", _serverToken);
 
 
         this.dashboard = new Dashboard(this);
         //this.MainContent.Content = this.reporter;
         this.MainContent.Content = this.dashboard;
 
+    }
+
+    private static int ReserveAvailablePort()
+    {
+        var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
     // check Port is in use
     private async Task<bool> IsPortInUseAsync(int port, string host = "127.0.0.1")
@@ -68,84 +84,45 @@ public partial class MainWindow : Window
         catch { return false; }
     }
 
-    // Wait for port to be closed with timeout
-    private async Task<bool> WaitPortClosedAsync(int port, int timeoutSeconds = 8)
+    private static string ClassifyPythonStderrLevel(string line)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (!await IsPortInUseAsync(port)) return true;
-            await Task.Delay(200);
-        }
-        return !await IsPortInUseAsync(port);
+        if (string.IsNullOrWhiteSpace(line))
+            return "INFO";
+
+        var text = line.Trim();
+
+        if (text.StartsWith("WARNING: This is a development server.", StringComparison.OrdinalIgnoreCase))
+            return "WARN";
+
+        if (text.StartsWith("* Serving Flask app", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("* Debug mode:", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("* Running on", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("Press CTRL+C to quit", StringComparison.OrdinalIgnoreCase))
+            return "INFO";
+
+        if (Regex.IsMatch(text, @"^\d{1,3}(?:\.\d{1,3}){3}\s-\s-\s\[\d{2}/[A-Za-z]{3}/\d{4}\s"))
+            return "INFO";
+
+        if (text.StartsWith("Traceback", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("Exception", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("ImportError", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("ModuleNotFoundError", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("RuntimeError", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
+            return "ERROR";
+
+        if (text.Contains("warning", StringComparison.OrdinalIgnoreCase))
+            return "WARN";
+
+        return "INFO";
     }
-
-    // force to terminate process（Windows：netstat -ano | findstr :{port}）
-    private async Task KillProcessOnPortAsync(int port)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo("cmd.exe", $"/c netstat -ano | findstr :{port}")
-            {
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var p = Process.Start(psi)!;
-            string output = await p.StandardOutput.ReadToEndAsync();
-            p.WaitForExit(2000);
-
-            var pids = new HashSet<int>();
-            foreach (var rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var line = rawLine.Trim();
-                if (!line.Contains($":{port}")) continue;
-
-                var cols = Regex.Split(line, @"\s+");
-                if (cols.Length >= 5 && int.TryParse(cols[^1], out int pid))
-                    pids.Add(pid);
-            }
-
-            foreach (var pid in pids)
-            {
-                try
-                {
-                    var proc = Process.GetProcessById(pid);
-                    proc.Kill(entireProcessTree: true);
-                }
-                catch { /* ignore */ }
-            }
-
-            await WaitPortClosedAsync(port, timeoutSeconds: 8);
-        }
-        catch { /* ignore */ }
-    }
-
-    // POST /shutdown gracefully within timeout to avoid exceptions, return whether port is closed
-    private async Task<bool> TryGracefulShutdownAsync(string baseUrl, int port)
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); // 
-                                                                                  
-            if (_httpClient?.BaseAddress == null)
-                await new HttpClient().PostAsync($"{baseUrl.TrimEnd('/')}/shutdown", null, cts.Token);
-            else
-                await _httpClient.PostAsync("/shutdown", null, cts.Token);
-        }
-        catch
-        {
-            // ignore exceptions, likely due to server already shutting down
-        }
-
-        // give it some time to close the port
-        return await WaitPortClosedAsync(port, timeoutSeconds: 8);
-    }
-
-
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        // Screenshot/design QA can render the full shell without starting external runtimes.
+        if (Environment.GetEnvironmentVariable("FORESITE_UI_PREVIEW") == "1")
+            return;
+
         if (!EnsureEnvironmentInitialized())
         {
             Close();
@@ -170,7 +147,7 @@ public partial class MainWindow : Window
                 // Attempt graceful shutdown via HTTP POST request
                 try
                 {
-                    HttpResponseMessage response = await _httpClient.PostAsync("http://127.0.0.1:5001/shutdown", null);
+                    HttpResponseMessage response = await _httpClient.PostAsync("/shutdown", null);
                     if (response.IsSuccessStatusCode)
                     {
                         Console.WriteLine("Shutdown request sent successfully.");
@@ -287,10 +264,8 @@ public partial class MainWindow : Window
 
     private string GetConfigPath()
     {
-        string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        string serverDirectory = Path.Combine(baseDirectory, "Server");
-        Directory.CreateDirectory(serverDirectory);
-        return Path.Combine(serverDirectory, "config.json");
+        AppPaths.EnsureInitialized();
+        return AppPaths.ConfigPath;
     }
 
     private static bool IsConfigInitialized(JObject config)
@@ -396,9 +371,9 @@ public partial class MainWindow : Window
             config["RPath"] = rHomePath;
             config["activateCommand"] = activateCommand;
             config["serverPath"] = "epyflaServer.py";
-            config["logPath"] = @"Server\flask_log.txt";
-            config["rUserPath"] = @"Server\r_user";
-            config["rLibsUserPath"] = @"Server\r_user\library";
+            config["logPath"] = AppPaths.LogPath;
+            config["rUserPath"] = AppPaths.RUserPath;
+            config["rLibsUserPath"] = AppPaths.RLibraryPath;
             config["initialized"] = true;
             //config["Initialized"] = true;
 
@@ -417,31 +392,6 @@ public partial class MainWindow : Window
 
     private async Task StartFlaskAndSendRequestAsync()
     {
-        //  if in use, gracely shutdown, then kill, restart to avoid port conflict
-        try
-        {
-            var baseUrl = _httpClient?.BaseAddress?.ToString() ?? SERVER_BASE_URL; // 
-            if (!string.IsNullOrEmpty(baseUrl) &&
-                baseUrl.StartsWith("http://127.0.0.1:5001", StringComparison.OrdinalIgnoreCase))
-            {
-                Debug.WriteLine("🟡 Attempt graceful shutdown of existing Flask on :5001 ...");
-                bool closed = await TryGracefulShutdownAsync(baseUrl, 5001);
-
-                if (!closed)
-                {
-                    Debug.WriteLine("🔴 Graceful shutdown failed or timed out. Force killing processes on :5001 ...");
-                    await KillProcessOnPortAsync(5001);
-                }
-                else
-                {
-                    Debug.WriteLine("✅ Flask gracefully shut down and port 5001 released.");
-                }
-            }
-        }
-        catch { /* ignore */ }
-
-
-
         // Get the current execution directory
         string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
         string serverDirectory = Path.Combine(baseDirectory, "Server");
@@ -454,9 +404,9 @@ public partial class MainWindow : Window
             ["serverPath"] = @"epyflaServer.py",
             ["activateCommand"] = @"epysurv311\Scripts\activate.bat",
             ["envName"] = "epysurv311",
-            ["logPath"] = @"Server\flask_log.txt",
-            ["rUserPath"] = @"Server\r_user",
-            ["rLibsUserPath"] = @"Server\r_user\library"
+            ["logPath"] = AppPaths.LogPath,
+            ["rUserPath"] = AppPaths.RUserPath,
+            ["rLibsUserPath"] = AppPaths.RLibraryPath
         };
 
 
@@ -492,7 +442,7 @@ public partial class MainWindow : Window
         string rPath = ResolveRHomePath(baseDirectory, config.Value<string>("RPath") ?? string.Empty);
         string serverPath = ResolvePath(serverDirectory, config.Value<string>("serverPath") ?? string.Empty);
 
-        string logPath = ResolvePath(baseDirectory, config.Value<string>("logPath") ?? @"Server\flask_log.txt");
+        string logPath = ResolvePath(baseDirectory, config.Value<string>("logPath") ?? AppPaths.LogPath);
         if (!File.Exists(logPath))
         {
             // Ensure the directory exists before creating the log file
@@ -551,10 +501,15 @@ public partial class MainWindow : Window
         }
         start.EnvironmentVariables["PATH"] = string.Join(";", pathParts);
         start.EnvironmentVariables["RPY2_CFFI_MODE"] = "ABI";
+        start.EnvironmentVariables["FORESITE_PORT"] = _serverPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        start.EnvironmentVariables["FORESITE_API_TOKEN"] = _serverToken;
+        start.EnvironmentVariables["FORESITE_DATABASE_PATH"] = AppPaths.DatabasePath;
+        start.EnvironmentVariables["FORESITE_CONFIG_PATH"] = AppPaths.ConfigPath;
+        start.EnvironmentVariables["FORESITE_DATA_DIR"] = AppPaths.UserDataDirectory;
 
         // Add additional R environment variables from config.
-        string rUserPath = ResolvePath(baseDirectory, config.Value<string>("rUserPath") ?? @"Server\r_user");
-        string rLibsUserPath = ResolvePath(baseDirectory, config.Value<string>("rLibsUserPath") ?? @"Server\r_user\library");
+        string rUserPath = ResolvePath(baseDirectory, config.Value<string>("rUserPath") ?? AppPaths.RUserPath);
+        string rLibsUserPath = ResolvePath(baseDirectory, config.Value<string>("rLibsUserPath") ?? AppPaths.RLibraryPath);
         Directory.CreateDirectory(rUserPath);
         Directory.CreateDirectory(rLibsUserPath);
         start.EnvironmentVariables["R_USER"] = rUserPath;
@@ -624,7 +579,8 @@ public partial class MainWindow : Window
                     if (earlyStdErr.Length > 0) earlyStdErr.AppendLine();
                     earlyStdErr.Append(errLine);
                 }
-                GlobalLogWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [ERROR] {errLine}");
+                var level = ClassifyPythonStderrLevel(errLine);
+                GlobalLogWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff}] [{level}] {errLine}");
             }
         });
 
@@ -649,7 +605,7 @@ public partial class MainWindow : Window
                 throw new InvalidOperationException($"Python server exited early with code {runningProcess.ExitCode}.{details}");
             }
 
-            if (await IsPortInUseAsync(5001))
+            if (await IsPortInUseAsync(_serverPort))
             {
                 ready = true;
                 break;
@@ -660,10 +616,10 @@ public partial class MainWindow : Window
 
         if (!ready)
         {
-            throw new TimeoutException("Python server did not become ready on 127.0.0.1:5001 within timeout.");
+            throw new TimeoutException($"Python server did not become ready on 127.0.0.1:{_serverPort} within timeout.");
         }
 
-        Debug.WriteLine("✅ Flask started successfully and port 5001 is ready.");
+        Debug.WriteLine($"✅ Flask started successfully and port {_serverPort} is ready.");
     }
 
 

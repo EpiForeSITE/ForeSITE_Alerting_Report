@@ -1,6 +1,5 @@
 ﻿using ForeSITEScheduler;
 using Newtonsoft.Json.Linq;
-using Org.BouncyCastle.Utilities;
 using QuestPDF.Fluent;
 using SchedulerRunner;
 using System;
@@ -15,6 +14,7 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,7 +28,9 @@ internal static class Program
     
     private static readonly string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
     private static readonly string ServerDir = Path.Combine(BaseDir, "Server");
-    private static readonly string configPath = Path.Combine(ServerDir, "config.json");
+    private static readonly string UserDataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ForeSITE");
+    private static readonly string configPath = Path.Combine(UserDataDir, "config.json");
 
 
     private static string PythonExe = Path.Combine(BaseDir, @"epysurv311\python.exe");
@@ -36,8 +38,9 @@ internal static class Program
     private static string R_HOME = Path.Combine(BaseDir, @"epysurv311\Lib\R");
     private static string FullCommand = "";
 
-    private const string SERVER_BASE_URL = "http://127.0.0.1:5001";
-    private const int SERVER_PORT = 5001;
+    private static readonly int SERVER_PORT = ReserveAvailablePort();
+    private static readonly string SERVER_TOKEN = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private static readonly string SERVER_BASE_URL = $"http://127.0.0.1:{SERVER_PORT}";
 
     
     private static HttpClient CreateHttpClient()
@@ -59,6 +62,15 @@ internal static class Program
         };
     }
 
+    private static int ReserveAvailablePort()
+    {
+        var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
     private static readonly HttpClient Http = CreateHttpClient();
 
 
@@ -71,7 +83,8 @@ internal static class Program
     // ================== Entry ==================
     private static async Task<int> Main(string[] args)
     {
-        Http.DefaultRequestHeaders.Add("User-Agent", "NotebookApp/1.0");
+        Http.DefaultRequestHeaders.Add("User-Agent", "ForeSITE-Scheduler/2.0");
+        Http.DefaultRequestHeaders.Add("X-ForeSITE-Token", SERVER_TOKEN);
         WriteLine("ForeSITEScheduler Runner starting...");
 
         dynamic config = new
@@ -134,8 +147,17 @@ internal static class Program
 
         try
         {
+            if (await WindowsNotificationService.InitializeAndHandleActivationAsync())
+            {
+                WriteLine("Windows notification activation handled.");
+                return 0;
+            }
+
             // QuestPDF license
             QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+            if (!DBHelper.InitializeDatabase())
+                throw new InvalidOperationException("Unable to initialize or migrate the scheduler database.");
 
             // 1) ensure Flask server is running
             await EnsureServerAsync();
@@ -151,7 +173,7 @@ internal static class Program
 
             // 3) select due tasks
             var today = DateTime.Today;
-            var due = tasks.Where(t => IsDueToday(today, t.StartDate, t.Freq)).ToList();
+            var due = tasks.Where(t => t.IsEnabled && IsDueToday(today, t.StartDate, t.Freq)).ToList();
             if (due.Count == 0)
             {
                 WriteLine("No due tasks for today.");
@@ -162,6 +184,8 @@ internal static class Program
             foreach (var task in due)
             {
                 WriteLine($"Running scheduler Id={task.Id} ...");
+                DateTime startedAt = DateTime.Now;
+                int? reportId = task.ReportId;
 
                 if (string.IsNullOrWhiteSpace(task.AttachmentPath) || !File.Exists(task.AttachmentPath))
                 {
@@ -169,46 +193,72 @@ internal static class Program
                     continue;
                 }
 
-                // read template
-                var jsonText = File.ReadAllText(task.AttachmentPath);
-                var template = JObject.Parse(jsonText);
-
-                // 
-                template["__sourcePath"] = task.AttachmentPath;
-
-                // 
-                string? pdfOut = await ProcessTemplateAsync(template);
-               
-
-                if (string.IsNullOrEmpty(pdfOut))
-                {
-                    WriteLine("  ℹ️ No abnormal pattern. Skip PDF and email.");
-                    continue; // 
-                }
-                WriteLine($"  ✅ PDF generated: {pdfOut}");
-
-                // === email ===
                 try
                 {
-                    var recipients = SmtpConfig.ParseRecipients(task.Recipients ?? "");
-                    if (recipients.Count > 0)
-                    {
-                        var smtp = SmtpConfig.LoadSmtpConfig();
-                        Console.WriteLine($"  Using SMTP server: {smtp.Host}:{smtp.Port}, SSL={smtp.EnableSsl}, User={smtp.Username}");
-                        string subject = $"Automated Report - {DateTime.Now:yyyy-MM-dd}";
-                        string body = "Please find the attached report.\n\n(This email was sent automatically.)\n\nJob name:"+ task.Id.ToString();
+                    // Read the immutable report definition used for this run.
+                    var jsonText = File.ReadAllText(task.AttachmentPath);
+                    var template = JObject.Parse(jsonText);
+                    reportId ??= DBHelper.EnsureReportForScheduler(task.Id, task.AttachmentPath, jsonText);
+                    template["__sourcePath"] = task.AttachmentPath;
+                    template["__reportId"] = reportId.Value;
 
-                        await SmtpConfig.SendReportEmailAsync(smtp, recipients, subject, body, pdfOut);
-                        WriteLine($"  📧 Email sent to: {string.Join(", ", recipients)}");
+                    ReportExecutionResult result = await ProcessTemplateAsync(template);
+                    string runStatus = result.IsAbnormal ? "Abnormal" : "Normal";
+                    DBHelper.InsertReportRun(reportId.Value, task.Id, startedAt, DateTime.Now,
+                        runStatus, result.IsAbnormal, result.PdfPath, result.SnapshotJson, null);
+                    WriteLine($"  ✅ Report run saved: {runStatus}; PDF={result.PdfPath}");
+
+                    bool abnormalOnly = template["schedule"]?["abnormalReportFlag"]?.ToObject<bool>() ?? false;
+                    if (abnormalOnly && !result.IsAbnormal)
+                    {
+                        WriteLine("  ℹ️ Normal result saved to Report View; delivery filter suppressed notification/email.");
+                        continue;
+                    }
+
+                    if (string.Equals(task.DeliveryMethod, "Notification", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            WindowsNotificationService.ShowReportReady(task.Id, result.PdfPath!);
+                            WriteLine("  🔔 Windows notification displayed.");
+                        }
+                        catch (Exception notificationEx)
+                        {
+                            WriteLine($"  ⚠️ Failed to display Windows notification: {notificationEx.Message}");
+                        }
                     }
                     else
                     {
-                        WriteLine("  (No recipients configured; skip sending email)");
+                        try
+                        {
+                            var recipients = SmtpConfig.ParseRecipients(task.Recipients ?? "");
+                            if (recipients.Count > 0)
+                            {
+                                var smtp = SmtpConfig.LoadSmtpConfig();
+                                Console.WriteLine($"  Using SMTP server: {smtp.Host}:{smtp.Port}, SSL={smtp.EnableSsl}, User={smtp.Username}");
+                                string subject = $"Automated Report - {DateTime.Now:yyyy-MM-dd}";
+                                string body = "Please find the attached report.\n\n(This email was sent automatically.)\n\nJob name:" + task.Id;
+
+                                await SmtpConfig.SendReportEmailAsync(smtp, recipients, subject, body, result.PdfPath!);
+                                WriteLine($"  📧 Email sent to: {string.Join(", ", recipients)}");
+                            }
+                            else
+                            {
+                                WriteLine("  ⚠️ Email delivery selected, but no recipients are configured.");
+                            }
+                        }
+                        catch (Exception mailEx)
+                        {
+                            WriteLine($"  ⚠️ Failed to send email: {mailEx.Message}");
+                        }
                     }
                 }
-                catch (Exception mailEx)
+                catch (Exception taskEx)
                 {
-                    WriteLine($"  ⚠️ Failed to send email: {mailEx.Message}");
+                    if (reportId.HasValue)
+                        DBHelper.InsertReportRun(reportId.Value, task.Id, startedAt, DateTime.Now,
+                            "Failed", false, null, "{}", taskEx.Message);
+                    WriteLine($"  ❌ Report run failed and was recorded: {taskEx.Message}");
                 }
 
             }
@@ -223,12 +273,37 @@ internal static class Program
 
         finally
         {
+            await StopOwnedServerAsync();
+            WindowsNotificationService.Shutdown();
             //#if DEBUG
-            // Debug convenience: always pause
-            PauseIfInteractive(force: true);
+            PauseIfInteractive(force: false);
 //#else
 //        PauseIfInteractive(force: force );
 //#endif
+        }
+    }
+
+    private static async Task StopOwnedServerAsync()
+    {
+        if (FlaskProcess == null)
+            return;
+
+        try
+        {
+            if (!FlaskProcess.HasExited)
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                try { await Http.PostAsync("/shutdown", null, cts.Token); }
+                catch { /* process ownership lets us safely use the fallback below */ }
+
+                if (!FlaskProcess.WaitForExit(3000))
+                    FlaskProcess.Kill(entireProcessTree: true);
+            }
+        }
+        finally
+        {
+            FlaskProcess.Dispose();
+            FlaskProcess = null;
         }
     }
 
@@ -273,16 +348,6 @@ internal static class Program
         {
             WriteLine("Flask already healthy.");
             return;
-        }
-
-        WriteLine("Flask not healthy. Trying graceful shutdown...");
-        await TryGracefulShutdownAsync();
-
-        // if still not healthy, kill process on port
-        if (await IsPortInUseAsync(SERVER_PORT))
-        {
-            WriteLine("Port still busy, killing process on port...");
-            await KillProcessOnPortAsync(SERVER_PORT);
         }
 
         // start Flask
@@ -340,102 +405,7 @@ internal static class Program
         return false;
     }
 
-    private static async Task TryGracefulShutdownAsync()
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await Http.PostAsync("/shutdown", null, cts.Token);
-            await WaitPortClosedAsync(SERVER_PORT, 8);
-        }
-        catch { /* ignore */ }
-    }
-
-    private static async Task<bool> IsPortInUseAsync(int port, string host = "127.0.0.1")
-    {
-        try
-        {
-            using var client = new TcpClient();
-            var connectTask = client.ConnectAsync(host, port);
-            var completed = await Task.WhenAny(connectTask, Task.Delay(500));
-            return completed == connectTask && client.Connected;
-        }
-        catch { return false; }
-    }
-
-    private static async Task<bool> WaitPortClosedAsync(int port, int timeoutSeconds)
-    {
-        var until = DateTime.UtcNow.AddSeconds(timeoutSeconds);
-        while (DateTime.UtcNow < until)
-        {
-            if (!await IsPortInUseAsync(port)) return true;
-            await Task.Delay(200);
-        }
-        return !await IsPortInUseAsync(port);
-    }
-    private static async Task KillProcessOnPortAsync(int port)
-    {
-        try
-        {
-            // check IPv4 & IPv6
-            string cmd = $"/c netstat -ano | findstr :{port}";
-            var psi = new ProcessStartInfo("cmd.exe", cmd)
-            {
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var p = Process.Start(psi)!;
-            string output = await p.StandardOutput.ReadToEndAsync();
-            p.WaitForExit(2000);
-
-            var pids = new HashSet<int>();
-            foreach (var lineRaw in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var line = lineRaw.Trim();
-                if (!line.Contains($":{port}")) continue;
-                var cols = System.Text.RegularExpressions.Regex.Split(line, @"\s+");
-                if (cols.Length >= 5 && int.TryParse(cols[^1], out int pid))
-                    pids.Add(pid);
-            }
-
-            foreach (var pid in pids)
-            {
-                try
-                {
-                    // first try .NET kill
-                    Process.GetProcessById(pid).Kill(entireProcessTree: true);
-                }
-                catch
-                {
-                    // finally use taskkill
-                    try
-                    {
-                        var tk = new ProcessStartInfo("cmd.exe", $"/c taskkill /F /T /PID {pid}")
-                        {
-                            UseShellExecute = false,
-                            CreateNoWindow = true
-                        };
-                        using var tp = Process.Start(tk);
-                        tp?.WaitForExit(2000);
-                    }
-                    catch { /* ignore */ }
-                }
-            }
-
-            // wait port closed
-            var until = DateTime.UtcNow.AddSeconds(8);
-            while (DateTime.UtcNow < until)
-            {
-                if (!await IsPortInUseAsync(port) && !await IsPortInUseAsync(port, host: "::1")) break;
-                await Task.Delay(200);
-            }
-        }
-        catch { /* ignore */ }
-    }
-
-
-    private static async Task StartFlaskAsync()
+    private static Task StartFlaskAsync()
     {
         if (!File.Exists(PythonExe) || !File.Exists(ServerScript))
             throw new FileNotFoundException($"Python or server script not found. {PythonExe} | {ServerScript}");
@@ -455,6 +425,11 @@ internal static class Program
 
         // set R environment variables
         start.Environment["R_HOME"] = R_HOME;
+        start.Environment["FORESITE_PORT"] = SERVER_PORT.ToString(CultureInfo.InvariantCulture);
+        start.Environment["FORESITE_API_TOKEN"] = SERVER_TOKEN;
+        start.Environment["FORESITE_DATABASE_PATH"] = Path.Combine(UserDataDir, "Data", "foresite_alerting.db");
+        start.Environment["FORESITE_CONFIG_PATH"] = configPath;
+        start.Environment["FORESITE_DATA_DIR"] = UserDataDir;
 
         FlaskProcess = new Process { StartInfo = start, EnableRaisingEvents = true };
         FlaskProcess.OutputDataReceived += (_, a) => { if (a.Data != null) WriteLine("[FLASK] " + a.Data); };
@@ -462,6 +437,7 @@ internal static class Program
         FlaskProcess.Start();
         FlaskProcess.BeginOutputReadLine();
         FlaskProcess.BeginErrorReadLine();
+        return Task.CompletedTask;
     }
 
     // ====================================
@@ -499,7 +475,9 @@ internal static class Program
 
     // ====================================
 
-    private static async Task<string?> ProcessTemplateAsync(JObject template)
+    private record ReportExecutionResult(bool IsAbnormal, string PdfPath, string SnapshotJson);
+
+    private static async Task<ReportExecutionResult> ProcessTemplateAsync(JObject template)
     {
         // read schedule
         string scheduleStart = template["schedule"]?["startDate"]?.ToString() ?? DateTime.Today.ToString("yyyy-MM-dd");
@@ -511,6 +489,7 @@ internal static class Program
         // ordered items
         var items = new List<DocItem>();
         bool anyAbnormal = false;
+        var snapshotLayout = new JArray();
 
         var layout = template["layout"] as JArray ?? new JArray();
         foreach (var tok in layout.OfType<JObject>())
@@ -522,38 +501,52 @@ internal static class Program
                 var content = tok["content"] as JObject;
                 string text = content?["text"]?.ToString() ?? "";
                 items.Add(new DocItem(DocItemType.Text, text, Center: true));
+                snapshotLayout.Add(tok.DeepClone());
             }
             else if (type == "Comment")
             {
                 var content = tok["content"] as JObject;
                 string text = content?["text"]?.ToString() ?? "";
                 items.Add(new DocItem(DocItemType.Text, text, Center: false));
+                snapshotLayout.Add(tok.DeepClone());
             }
             else if (type == "Plot")
             {
                 // fill in params
                 var param = tok["params"] as JObject ?? new JObject();
                 param["beginDate"] = scheduleStart;
-
-                param["abnormalReportFlag"] = abnormalReportFlag;
+                // Always generate and persist the view; abnormalReportFlag controls delivery only.
+                param["abnormalReportFlag"] = false;
+                param["designFlag"] = true;
 
                 var resp = await RequestPlotAsync(param);
                 if (resp!=null  && !string.IsNullOrWhiteSpace(resp.PlotPath) && File.Exists(resp.PlotPath))
                 {
-                    anyAbnormal = true;
+                    anyAbnormal |= resp.Abnormal;
                     byte[] png = await File.ReadAllBytesAsync(resp.PlotPath!);
                     items.Add(new DocItem(DocItemType.Image, ImageBytes: png));
+                    snapshotLayout.Add(new JObject
+                    {
+                        ["type"] = "Plot",
+                        ["params"] = param.DeepClone(),
+                        ["imagePath"] = resp.PlotPath,
+                        ["abnormal"] = resp.Abnormal
+                    });
                 }
             }
             // else ignore unknown type such as add Table in the future
         }
 
-        if (!anyAbnormal)
-            return null;
-
         string outputPdf = GetOutputPdfPath(template);
         await GeneratePdfAsync(outputPdf, items);
-        return outputPdf;
+        var snapshot = new JObject
+        {
+            ["generatedAt"] = DateTime.Now.ToString("O", CultureInfo.InvariantCulture),
+            ["dataAsOf"] = DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["abnormal"] = anyAbnormal,
+            ["layout"] = snapshotLayout
+        };
+        return new ReportExecutionResult(anyAbnormal, outputPdf, snapshot.ToString());
     }
 
     private record PlotResponse(bool Abnormal, string? PlotPath);
@@ -563,7 +556,7 @@ internal static class Program
         using var content = new StringContent(body.ToString(), Encoding.UTF8, "application/json");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var resp = await Http.PostAsync("http://127.0.0.1:5001/epyapi", content, cts.Token);
+        var resp = await Http.PostAsync("/epyapi", content, cts.Token);
         resp.EnsureSuccessStatusCode();
 
         var txt = await resp.Content.ReadAsStringAsync(cts.Token);
@@ -577,7 +570,7 @@ internal static class Program
 
         if (status?.ToLower() == "processed"  && !string.IsNullOrEmpty(filePath))
         {
-            return new PlotResponse(true, filePath);
+            return new PlotResponse(isAbnormal, filePath);
         }
         else
         {
@@ -588,6 +581,14 @@ internal static class Program
 
     private static string GetOutputPdfPath(JObject template)
     {
+        int reportId = template["__reportId"]?.ToObject<int>() ?? 0;
+        if (reportId > 0)
+        {
+            string runDirectory = Path.Combine(UserDataDir, "Reports", reportId.ToString(CultureInfo.InvariantCulture), "Runs");
+            Directory.CreateDirectory(runDirectory);
+            return Path.Combine(runDirectory, $"Report_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
+        }
+
         var sourcePath = template["__sourcePath"]?.ToString();
         if (string.IsNullOrEmpty(sourcePath))
             sourcePath = Path.Combine(AppContext.BaseDirectory, "report_template.json");

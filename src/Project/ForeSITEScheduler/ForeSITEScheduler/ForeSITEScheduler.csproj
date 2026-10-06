@@ -2,7 +2,11 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Version>2.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <InformationalVersion>2.0</InformationalVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -11,6 +15,10 @@
 
 	  <!-- 自包含（带 .NET 运行时） -->
 	  <SelfContained>true</SelfContained>
+	  <WindowsPackageType>None</WindowsPackageType>
+	  <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	  <EnableMsixTooling>true</EnableMsixTooling>
+	  <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
 
 	  <!-- 单文件发布（在首次运行时自解压原生依赖） -->
 	  <PublishSingleFile>true</PublishSingleFile>
@@ -18,7 +26,7 @@
 	  <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 
 	  <!-- 修剪（可选：减小体积；若遇到反射/动态加载问题可先关掉） -->
-	  <PublishTrimmed>true</PublishTrimmed>
+	  <PublishTrimmed>false</PublishTrimmed>
 	  <TrimMode>partial</TrimMode>
 
 	  <!-- ReadyToRun（可选：加快启动/体积会增大） -->
@@ -29,8 +37,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MailKit" Version="4.13.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.6" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="QuestPDF" Version="2025.7.1" />
   </ItemGroup>
@@ -40,7 +48,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Server\config.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Server\epyflaServer.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -235,7 +243,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Server\foresite_alerting.db">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Server\local_covid_19_test_data.csv">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

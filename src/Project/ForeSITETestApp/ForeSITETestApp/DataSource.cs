@@ -545,12 +545,48 @@ namespace ForeSITETestApp
     public class SchedulerTask
     {
         public int Id { get; set; }
+        public int? ReportId { get; set; }
         public string? Recipients { get; set; }
         public string? AttachmentPath { get; set; }
         public string? StartDate { get; set; }   // 存 YYYY-MM-DD 格式
         public string? Freq { get; set; }
+        public string DeliveryMethod { get; set; } = "Email";
+        public bool IsEnabled { get; set; } = true;
 
         public bool IsSelected { get; set; }   // 绑定到 DataGridCheckBoxColumn
+    }
+
+    public class ReportRecord
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "Untitled Report";
+        public string DefinitionJson { get; set; } = "{}";
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public bool IsArchived { get; set; }
+        public int? SchedulerId { get; set; }
+        public bool ScheduleEnabled { get; set; }
+        public string Frequency { get; set; } = "Not scheduled";
+        public string DeliveryMethod { get; set; } = "None";
+        public string LastRunStatus { get; set; } = "Never run";
+        public DateTime? LastGeneratedAt { get; set; }
+        public string? LatestPdfPath { get; set; }
+    }
+
+    public class ReportRunRecord
+    {
+        public int Id { get; set; }
+        public int ReportId { get; set; }
+        public int? SchedulerId { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string? DataAsOf { get; set; }
+        public string Status { get; set; } = "Unknown";
+        public bool IsAbnormal { get; set; }
+        public string? PdfPath { get; set; }
+        public string SnapshotJson { get; set; } = "{}";
+        public string? ErrorMessage { get; set; }
+        public string SourceLabel => SchedulerId.HasValue ? $"Scheduled · Job {SchedulerId.Value}" : "Manual";
     }
 
 
