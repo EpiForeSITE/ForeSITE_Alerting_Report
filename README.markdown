@@ -19,6 +19,7 @@ This application integrates with a Python Flask localhost web server to process 
   - [Backend Processing](#backend-processing)
 
 - [Changelog](#changelog)
+  - [Version 2.0](#version-20)
   - [Version 0.9](#version-09)
   - [Version 0.8](#version-08)
   - [Version 0.7](#version-07)
@@ -43,7 +44,9 @@ This application integrates with a Python Flask localhost web server to process 
 
 - [Dependencies](#dependencies)
 
-- [Animation Demo](#animation-demo)
+- [Screenshot 2.0](#screenshot-20)
+
+- [Animation Demo (Version 1.0)](#animation-demo-version-10)
 
 - [Advanced Data Analysis with Notebook](#advanced-data-analysis-with-notebook)
 
@@ -91,6 +94,11 @@ This application integrates with a Python Flask localhost web server to process 
 - Local **Flask server** (`http://127.0.0.1:5001/epyapi`) for time-series processing and plot generation.  
 
 ##  Changelog
+
+### Version 2.0
+- Redesigned the interface with a Report Library for saved reports, report details, and run history.
+- Added a guided Report Builder workflow with Data, Period, Model, Visual, and Delivery steps.
+- Updated the live report canvas and report inspector for configuring analysis and report content.
 
 ### Version 0.9
 - Added Model Management to support user's Python package and R package installation
@@ -410,7 +418,17 @@ ForeSITE-Alerting-Report/
   - epySurv: Surveillance data processing module
   - pandas, matplotlib: Common data processing and plotting libraries (adjust based on `epySurv` requirements)
 
-## Animation Demo
+## Screenshot 2.0
+
+### Report Builder
+
+![ForeSITE Version 2.0 Report Builder](images/ForeSITE_2.0_Report_Builder.png)
+
+### Report Library
+
+![ForeSITE Version 2.0 Report Library](images/ForeSITE_2.0_Report_Library.png)
+
+## Animation Demo (Version 1.0)
 **How to setup our application?**
 ![Alerting1](images/ForeSITE_Alerting_Setup.gif)
 
