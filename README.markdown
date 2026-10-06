@@ -20,6 +20,7 @@ This application integrates with a Python Flask localhost web server to process 
 
 - [Changelog](#changelog)
   - [Version 2.0](#version-20)
+  - [Version 1.0](#version-10)
   - [Version 0.9](#version-09)
   - [Version 0.8](#version-08)
   - [Version 0.7](#version-07)
