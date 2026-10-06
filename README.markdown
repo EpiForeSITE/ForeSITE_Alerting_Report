@@ -100,6 +100,12 @@ This application integrates with a Python Flask localhost web server to process 
 - Added a guided Report Builder workflow with Data, Period, Model, Visual, and Delivery steps.
 - Updated the live report canvas and report inspector for configuring analysis and report content.
 
+### Version 1.0
+-- Upgraded core epySurv and migrated Python from 3.7 to 3.9 to improve compatibility, stability, and maintainability.
+-- Added a startup Splash Window to improve loading experience and communicate initialization status.
+-- Added CDC threshold backtest analysis to support data-driven threshold selection and better balance sensitivity vs. false alerts.
+-- Improved cross-version time-series date handling (pandas/numpy) and strengthened R/Python type conversion robustness.
+
 ### Version 0.9
 - Added Model Management to support user's Python package and R package installation
 - Prebuilt models (**Farrington, Bayes, Boda, CDC, EARS-C1**, etc.) for anomaly detection in clinical/public health data.    
