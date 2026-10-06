@@ -422,11 +422,11 @@ ForeSITE-Alerting-Report/
 
 ### Report Builder
 
-![ForeSITE Version 2.0 Report Builder](images/ForeSITE_2.0_Report_Builder.png)
+![ForeSITE Version 2.0 Report Builder](images/screenVer2_1.png)
 
 ### Report Library
 
-![ForeSITE Version 2.0 Report Library](images/ForeSITE_2.0_Report_Library.png)
+![ForeSITE Version 2.0 Report Library](images/screenVer2_2.png)
 
 ## Animation Demo (Version 1.0)
 **How to setup our application?**
